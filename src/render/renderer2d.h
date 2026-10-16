@@ -41,7 +41,8 @@ private:
 		float r, g, b, a;
 		float u, v;
 	};
-	SDL_GPUGraphicsPipeline* pipeline(int blend, const std::string& ps_name);
+	SDL_GPUGraphicsPipeline* pipeline(int blend, const std::string& ps_name, Uint32 samplers);
+	Texture* make_rule_texture(float now, float rate);
 	void draw_items(SDL_GPUCommandBuffer* cmd, const std::vector<DrawItem>& items);
 	void ensure_vertex_buffer(size_t bytes);
 
@@ -50,6 +51,9 @@ private:
 	SDL_GPUShader* vs_ = nullptr;
 	SDL_GPUSampler* sampler_linear_ = nullptr;
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
+	SDL_GPUTexture* mask_ = nullptr;  // screen-space picture of the current sprite's mask
+	SDL_GPUTexture* dest_ = nullptr;  // copy of the frame so far, for blend modes that read the destination
+	Texture* rule_ = nullptr;         // transition rule ramp
 	SDL_GPUBuffer* vbuf_ = nullptr;
 	SDL_GPUTransferBuffer* vtransfer_ = nullptr;
 	size_t vcapacity_ = 0;

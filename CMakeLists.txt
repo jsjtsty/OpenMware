@@ -52,13 +52,17 @@ target_include_directories(omw_render PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webp)
 
 # Every 2D shader of the manifest (the 3D scene shaders are not used by the game scripts).
-file(STRINGS ${PROJECT_SOURCE_DIR}/shaders/hlsl/manifest.tsv _omw_shader_rows)
+# The define lists contain ';', so rows are split by hand (file(STRINGS) would break them into list elements).
+file(READ ${PROJECT_SOURCE_DIR}/shaders/hlsl/manifest.tsv _omw_manifest)
+string(REPLACE ";" "|" _omw_manifest "${_omw_manifest}")
+string(REPLACE "\r" "" _omw_manifest "${_omw_manifest}")
+string(REPLACE "\n" ";" _omw_shader_rows "${_omw_manifest}")
 list(POP_FRONT _omw_shader_rows) # header
 foreach(_row IN LISTS _omw_shader_rows)
 	if(_row MATCHES "^([^	]+)	([^	]+)	(.*)$")
 		set(_name "${CMAKE_MATCH_1}")
 		set(_file "${CMAKE_MATCH_2}")
-		set(_defs "${CMAKE_MATCH_3}")
+		string(REPLACE "|" ";" _defs "${CMAKE_MATCH_3}")
 		if(_name MATCHES "^scene/" OR _file MATCHES "^scene/" OR _name MATCHES "^gs")
 			continue()
 		endif()

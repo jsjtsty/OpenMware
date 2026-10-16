@@ -20,14 +20,42 @@ struct SpriteUniforms { // cbuffer ConstantBuffer of vssprite (0x90 bytes)
 };
 static_assert(sizeof(SpriteUniforms) == 0x90);
 
-// Pixel shader of a blend mode (variant "normal": no mask/transition/displacement).
-std::string ps_for_blend(int blend) {
+// Pixel shader family of a blend mode (ADD/SUB/DISABLE reuse "blend" with another fixed-function state).
+const char* ps_family(int blend) {
 	switch (blend) {
-	case BLEND_MULTIPLE: return "pssprite_mul_normal";
-	case BLEND_SCREEN: return "pssprite_screen_normal";
-	default: return "pssprite_blend_normal"; // TODO: in-shader modes need the destination copy
+	case BLEND_MULTIPLE: return "mul";
+	case BLEND_SCREEN: return "screen";
+	case BLEND_OVERLAY: return "overlay";
+	case BLEND_COLOR_DODGE: return "colordodge";
+	case BLEND_LINEAR_DODGE: return "lineardodge";
+	case BLEND_COLOR_BURN: return "colorburn";
+	case BLEND_LINEAR_BURN: return "linearburn";
+	case BLEND_SOFT_LIGHT: return "softlight";
+	case BLEND_HARD_LIGHT: return "hardlight";
+	case BLEND_VIVID_LIGHT: return "vividlight";
+	case BLEND_LINEAR_LIGHT: return "linearlight";
+	case BLEND_PIN_LIGHT: return "pinlight";
+	case BLEND_HARD_MIX: return "hardmix";
+	case BLEND_DARKEN: return "darken";
+	case BLEND_LIGHTEN: return "lighten";
+	case BLEND_DIFFERENCE: return "difference";
+	case BLEND_EXCLUSION: return "exclusion";
+	default: return "blend";
 	}
 }
+
+std::string ps_for(int blend, bool mask, bool transition) {
+	std::string v = mask ? (transition ? "masktransition" : "mask") : (transition ? "transition" : "normal");
+	return std::string("pssprite_") + ps_family(blend) + "_" + v;
+}
+
+// Highest fragment texture register of a variant + 1 (the shaders bind t0, t2 mask, t3/t4 transition, t7 destination).
+Uint32 sampler_count(int blend, bool mask, bool transition) {
+	if (blend_reads_destination(blend)) return 8;
+	return transition ? 5 : mask ? 3 : 1;
+}
+
+float clamp01(float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
 
 } // namespace
 
@@ -53,11 +81,16 @@ bool Renderer2D::init(GpuContext& gpu, const GameFiles& files, std::string* erro
 	ti.layer_count_or_depth = 1;
 	ti.num_levels = 1;
 	frame_ = SDL_CreateGPUTexture(gpu.device, &ti);
+	mask_ = SDL_CreateGPUTexture(gpu.device, &ti);
+	ti.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+	dest_ = SDL_CreateGPUTexture(gpu.device, &ti);
 
 	const uint8_t px[4] = {255, 255, 255, 255};
 	white_.gpu = gpu.create_texture_rgba8(1, 1, px);
 	white_.w = white_.h = 1;
-	return frame_ && sampler_linear_ && white_.gpu;
+	const std::vector<uint8_t> ramp(256 * 4, 255);
+	rule_ = create_dynamic_texture(256, 1, ramp.data());
+	return frame_ && mask_ && dest_ && sampler_linear_ && white_.gpu && rule_;
 }
 
 void Renderer2D::shutdown() {
@@ -71,6 +104,8 @@ void Renderer2D::shutdown() {
 	if (vbuf_) SDL_ReleaseGPUBuffer(gpu_->device, vbuf_);
 	if (vtransfer_) SDL_ReleaseGPUTransferBuffer(gpu_->device, vtransfer_);
 	if (frame_) SDL_ReleaseGPUTexture(gpu_->device, frame_);
+	if (mask_) SDL_ReleaseGPUTexture(gpu_->device, mask_);
+	if (dest_) SDL_ReleaseGPUTexture(gpu_->device, dest_);
 	if (sampler_linear_) SDL_ReleaseGPUSampler(gpu_->device, sampler_linear_);
 	if (vs_) SDL_ReleaseGPUShader(gpu_->device, vs_);
 	pipelines_.clear();
@@ -127,11 +162,11 @@ Texture* Renderer2D::texture(const std::string& path) {
 	return raw->gpu ? raw : nullptr;
 }
 
-SDL_GPUGraphicsPipeline* Renderer2D::pipeline(int blend, const std::string& ps_name) {
+SDL_GPUGraphicsPipeline* Renderer2D::pipeline(int blend, const std::string& ps_name, Uint32 samplers) {
 	const auto key = std::make_pair(blend, ps_name);
 	if (const auto it = pipelines_.find(key); it != pipelines_.end()) return it->second;
 	SDL_GPUShader*& ps = shaders_[ps_name];
-	if (!ps) ps = gpu_->load_shader(ps_name + ".frag", SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
+	if (!ps) ps = gpu_->load_shader(ps_name + ".frag", SDL_GPU_SHADERSTAGE_FRAGMENT, samplers, 0);
 	if (!ps) {
 		std::fprintf(stderr, "[render] missing pixel shader %s\n", ps_name.c_str());
 		return pipelines_[key] = nullptr;
@@ -166,13 +201,45 @@ void Renderer2D::ensure_vertex_buffer(size_t bytes) {
 	vtransfer_ = SDL_CreateGPUTransferBuffer(gpu_->device, &ti);
 }
 
+// The transition rule ramp (what psUpdateTransitionRule renders): alpha as a function of the transition image value.
+Texture* Renderer2D::make_rule_texture(float now, float rate) {
+	uint8_t px[256 * 4];
+	for (int i = 0; i < 256; i++) {
+		const float x = static_cast<float>(i) / 255.f;
+		float value;
+		if (rate <= 0.f) {
+			value = now >= x ? 1.f : 0.f; // psUpdateTransitionRule_Rate0
+		} else {
+			const float slope = 2.f / rate;
+			const float intercept = slope * now;
+			const float edge = 1.f - now * (1.f / slope + 1.f);
+			value = clamp01(x * (-slope * edge - intercept) + intercept);
+		}
+		const uint8_t b = static_cast<uint8_t>(value * 255.f + 0.5f);
+		px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = b;
+		px[i * 4 + 3] = 255;
+	}
+	replace_dynamic_texture(rule_, 256, 1, px);
+	return rule_;
+}
+
 void Renderer2D::draw_items(SDL_GPUCommandBuffer* cmd, const std::vector<DrawItem>& items) {
+	// Vertices: every item's quad, then the mask quads of the masked items.
 	verts_.clear();
-	for (const DrawItem& d : items) {
+	auto push_quad = [&](const DrawQuad& d) {
 		Vertex q[4];
 		for (int i = 0; i < 4; i++)
 			q[i] = {d.x[i] / (Stage::kWidth / 2.f) - 1.f, 1.f - d.y[i] / (Stage::kHeight / 2.f), 0.f, 1.f, d.r[i], d.g[i], d.b[i], d.a, d.u[i], d.v[i]};
 		for (int i : {0, 1, 2, 0, 2, 3}) verts_.push_back(q[i]);
+	};
+	for (const DrawItem& d : items) push_quad(d);
+	std::vector<size_t> mask_first(items.size(), 0);
+	for (size_t i = 0; i < items.size(); i++) {
+		if (!items[i].has_mask) continue;
+		mask_first[i] = verts_.size();
+		DrawQuad m = items[i].mask;
+		m.a = 1.f; // the mask picture is stored as is; the sprite's own fade does not dim it
+		push_quad(m);
 	}
 	if (!verts_.empty()) {
 		const size_t bytes = verts_.size() * sizeof(Vertex);
@@ -187,37 +254,96 @@ void Renderer2D::draw_items(SDL_GPUCommandBuffer* cmd, const std::vector<DrawIte
 		SDL_EndGPUCopyPass(cp);
 	}
 
-	SDL_GPUColorTargetInfo ci{};
-	ci.texture = frame_;
-	ci.clear_color = {0.f, 0.f, 0.f, 1.f};
-	ci.load_op = SDL_GPU_LOADOP_CLEAR;
-	ci.store_op = SDL_GPU_STOREOP_STORE;
-	SDL_GPURenderPass* rp = SDL_BeginGPURenderPass(cmd, &ci, 1, nullptr);
-
 	SpriteUniforms u{};
 	u.color_balance[0] = u.color_balance[1] = u.color_balance[2] = u.color_balance[3] = 1.f;
-	const float mT[16] = {0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1, 0, 0.5f, 0.5f, 0, 1}; // clip space -> texture space
+	// clip space -> texture space, stored for HLSL's default column-major cbuffer matrices (mul(v, M) with a row vector)
+	const float mT[16] = {0.5f, 0, 0, 0.5f, 0, -0.5f, 0, 0.5f, 0, 0, 1, 0, 0, 0, 0, 1};
 	std::memcpy(u.mT, mT, sizeof(mT));
-	SDL_PushGPUVertexUniformData(cmd, 0, &u, sizeof(u));
 
-	if (!verts_.empty()) {
-		SDL_GPUBufferBinding bind{vbuf_, 0};
-		SDL_BindGPUVertexBuffers(rp, 0, &bind, 1);
-		size_t i = 0;
-		while (i < items.size()) {
+	SDL_GPURenderPass* rp = nullptr;
+	auto begin_pass = [&](SDL_GPUTexture* target, bool clear, float clear_a) {
+		SDL_GPUColorTargetInfo ci{};
+		ci.texture = target;
+		ci.clear_color = {0.f, 0.f, 0.f, clear_a};
+		ci.load_op = clear ? SDL_GPU_LOADOP_CLEAR : SDL_GPU_LOADOP_LOAD;
+		ci.store_op = SDL_GPU_STOREOP_STORE;
+		rp = SDL_BeginGPURenderPass(cmd, &ci, 1, nullptr);
+		SDL_PushGPUVertexUniformData(cmd, 0, &u, sizeof(u));
+		if (!verts_.empty()) {
+			SDL_GPUBufferBinding bind{vbuf_, 0};
+			SDL_BindGPUVertexBuffers(rp, 0, &bind, 1);
+		}
+	};
+	auto end_pass = [&] {
+		SDL_EndGPURenderPass(rp);
+		rp = nullptr;
+	};
+	auto tex_of = [&](const Texture* t) { return t ? t : &white_; };
+
+	begin_pass(frame_, true, 1.f);
+	size_t i = 0;
+	while (i < items.size()) {
+		const DrawItem& it = items[i];
+		const bool reads_dest = blend_reads_destination(it.blend);
+		const bool special = it.has_mask || it.trans_tex || reads_dest;
+		if (!special) { // batch consecutive plain quads with the same state and texture
 			size_t j = i + 1;
-			const Texture* tex = items[i].texture ? items[i].texture : &white_;
-			while (j < items.size() && items[j].blend == items[i].blend && (items[j].texture ? items[j].texture : &white_) == tex) j++;
-			if (SDL_GPUGraphicsPipeline* p = pipeline(items[i].blend, ps_for_blend(items[i].blend))) {
+			const Texture* tex = tex_of(it.texture);
+			while (j < items.size() && !items[j].has_mask && !items[j].trans_tex && !blend_reads_destination(items[j].blend) &&
+				   items[j].blend == it.blend && tex_of(items[j].texture) == tex)
+				j++;
+			if (SDL_GPUGraphicsPipeline* p = pipeline(it.blend, ps_for(it.blend, false, false), 1)) {
 				SDL_BindGPUGraphicsPipeline(rp, p);
 				SDL_GPUTextureSamplerBinding ts{tex->gpu, sampler_linear_};
 				SDL_BindGPUFragmentSamplers(rp, 0, &ts, 1);
 				SDL_DrawGPUPrimitives(rp, static_cast<Uint32>((j - i) * 6), 1, static_cast<Uint32>(i * 6), 0);
 			}
 			i = j;
+			continue;
 		}
+
+		// A sprite with a mask picture and/or a destination read: helper work between passes.
+		if (it.has_mask || reads_dest) {
+			end_pass();
+			if (it.has_mask) {
+				begin_pass(mask_, true, 0.f);
+				if (SDL_GPUGraphicsPipeline* p = pipeline(BLEND_DISABLE, ps_for(BLEND_NORMAL, false, false), 1)) {
+					SDL_BindGPUGraphicsPipeline(rp, p);
+					SDL_GPUTextureSamplerBinding ts{tex_of(it.mask.texture)->gpu, sampler_linear_};
+					SDL_BindGPUFragmentSamplers(rp, 0, &ts, 1);
+					SDL_DrawGPUPrimitives(rp, 6, 1, static_cast<Uint32>(mask_first[i]), 0);
+				}
+				end_pass();
+			}
+			if (reads_dest) {
+				SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
+				SDL_GPUTextureLocation from{frame_, 0, 0, 0, 0, 0}, to{dest_, 0, 0, 0, 0, 0};
+				SDL_CopyGPUTextureToTexture(cp, &from, &to, Stage::kWidth, Stage::kHeight, 1, false);
+				SDL_EndGPUCopyPass(cp);
+			}
+			begin_pass(frame_, false, 1.f);
+		}
+
+		const bool trans = it.trans_tex != nullptr;
+		const Uint32 n = sampler_count(it.blend, it.has_mask, trans);
+		std::string name = ps_for(it.blend, it.has_mask, trans);
+		if (SDL_GPUGraphicsPipeline* p = pipeline(it.blend, name, n)) {
+			SDL_GPUTextureSamplerBinding slots[8];
+			for (auto& s : slots) s = {white_.gpu, sampler_linear_};
+			slots[0].texture = tex_of(it.texture)->gpu;
+			slots[2].texture = mask_;
+			if (trans) {
+				slots[3].texture = it.trans_tex->gpu;
+				slots[4].texture = make_rule_texture(it.trans_now, it.trans_rate)->gpu;
+			}
+			slots[7].texture = dest_;
+			SDL_BindGPUGraphicsPipeline(rp, p);
+			SDL_BindGPUFragmentSamplers(rp, 0, slots, n);
+			SDL_DrawGPUPrimitives(rp, 6, 1, static_cast<Uint32>(i * 6), 0);
+		}
+		i++;
 	}
-	SDL_EndGPURenderPass(rp);
+	end_pass();
 }
 
 bool Renderer2D::render_frame(const std::vector<DrawItem>& items) {

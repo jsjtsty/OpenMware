@@ -246,9 +246,52 @@ SQInteger is_up(HSQUIRRELVM v) { // left button released over the sprite
 }
 SQInteger ret_null(HSQUIRRELVM) { return 0; }
 
+SQInteger set_mask(HSQUIRRELVM v) { // (sprite name)
+	const std::string name = arg_string(v, 2);
+	spr(v)->mask = host().stage && !name.empty() ? host().stage->find(name) : nullptr;
+	return 0;
+}
+SQInteger set_displacement_map(HSQUIRRELVM v) {
+	const std::string name = arg_string(v, 2);
+	spr(v)->displacement = host().stage && !name.empty() ? host().stage->find(name) : nullptr;
+	return 0;
+}
+SQInteger set_diffuse_only(HSQUIRRELVM) { return 0; }
+SQInteger mask_ctor(HSQUIRRELVM v) {
+	const SQInteger r = ctor(v);
+	if (Sprite* s = spr(v)) s->is_mask = true;
+	return r;
+}
+
+// transition(src, dst, rate, rule_image, time_ms, tempo): the sprite appears/disappears through the rule image.
+SQInteger transition(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	const std::string file = arg_string(v, 5);
+	s->trans_file = file;
+	s->trans_on = !file.empty();
+	s->trans_tex = s->trans_on && host().renderer ? host().renderer->texture(file) : nullptr;
+	s->trans_rate = arg_float(v, 4);
+	s->trans.set({arg_float(v, 2)});
+	s->trans.start({arg_float(v, 3)}, arg_float(v, 6), static_cast<int>(arg_int(v, 7)));
+	return 0;
+}
+SQInteger is_transitioning(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->trans.active); return 1; }
+SQInteger get_transition_timer(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->trans.active ? spr(v)->trans.duration - spr(v)->trans.timer : 0.f); return 1; }
+SQInteger get_transition_file(HSQUIRRELVM v) { sq_pushstring(v, spr(v)->trans_file.c_str(), -1); return 1; }
+
+static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor);
 void register_sprite_class(ScriptHost& h) {
 	h.begin_class("SQSprite");
-	h.add_method("constructor", ctor);
+	register_sprite_members(h, ctor);
+	h.end_class();
+	h.begin_class("SQSpriteMask");
+	register_sprite_members(h, mask_ctor);
+	h.add_method("setDiffuseOnly", set_diffuse_only);
+	h.end_class();
+}
+
+static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor) {
+	h.add_method("constructor", constructor);
 	h.add_method("create", create);
 	h.add_method("createSubresource", create);
 	h.add_method("createColor", create_color);
@@ -266,7 +309,12 @@ void register_sprite_class(ScriptHost& h) {
 	h.add_method("setColor", set_color);
 	h.add_method("getColor", get_color);
 	h.add_method("isDeletedTexture", is_deleted_texture);
-	h.end_class();
+	h.add_method("setMask", set_mask);
+	h.add_method("setDisplacementMap", set_displacement_map);
+	h.add_method("transition", transition);
+	h.add_method("isTransitioning", is_transitioning);
+	h.add_method("getTransitionTimer", get_transition_timer);
+	h.add_method("getTransitionFilename", get_transition_file);
 }
 
 } // namespace omw

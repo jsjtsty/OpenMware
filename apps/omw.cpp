@@ -13,6 +13,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 
 using namespace omw;
 
@@ -46,6 +48,13 @@ int main(int argc, char** argv) {
 			const std::string spec = argv[++i];
 			c.click = spec.find("click") != std::string::npos;
 			if (std::sscanf(spec.c_str(), "%d:%f:%f", &c.frame, &c.x, &c.y) == 3) mouse_cmds.push_back(c);
+		}
+		else if (a == "--eval-file" && i + 1 < argc) { // FRAME:PATH (script snippet read from a UTF-8 file)
+			const std::string spec = argv[++i];
+			std::ifstream in(spec.substr(spec.find(':') + 1), std::ios::binary);
+			std::stringstream ss;
+			ss << in.rdbuf();
+			evals.emplace_back(std::atoi(spec.c_str()), ss.str());
 		}
 		else if (a == "--press" && i + 1 < argc) {
 			int f = 0, k = 0;

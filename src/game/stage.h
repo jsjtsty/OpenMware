@@ -39,6 +39,15 @@ struct Sprite {
 	Anim<1> fade{1.f};
 	std::array<Anim<3>, 4> color; // per-corner RGB (0..255)
 	Anim<2> scroll{0.f};
+	bool is_mask = false;   // SQSpriteMask: never drawn itself, only as the mask of other sprites
+	std::weak_ptr<Sprite> mask;           // SetMask: sprite whose picture multiplies this one (screen space)
+	std::weak_ptr<Sprite> displacement;   // SetDisplacementMap
+	// Transition (SQSprite.transition): the sprite shows through a rule image; `trans` runs 0..1 (invisible..visible)
+	bool trans_on = false;
+	Anim<1> trans{0.f};
+	float trans_rate = 0.3f;
+	std::string trans_file;
+	Texture* trans_tex = nullptr;
 	bool clickable = false, check_alpha = false; // SetClickable: takes part in mouse hit testing
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
@@ -49,13 +58,21 @@ struct Sprite {
 };
 
 // One quad of the frame, in virtual 1024x576 pixel coordinates before projection.
-struct DrawItem {
+struct DrawQuad {
 	Texture* texture = nullptr;
-	int blend = BLEND_NORMAL;
 	float x[4], y[4];       // corner positions in game pixels (TL, TR, BR, BL)
 	float u[4], v[4];       // texture coordinates
 	float r[4], g[4], b[4]; // corner colours 0..1
 	float a = 1.f;
+};
+
+struct DrawItem : DrawQuad {
+	int blend = BLEND_NORMAL;
+	// mask / displacement sprites are drawn into screen-space helper textures; transition rule image + progress
+	bool has_mask = false, has_disp = false;
+	DrawQuad mask, disp;
+	Texture* trans_tex = nullptr; // null: no transition
+	float trans_now = 0.f, trans_rate = 0.3f;
 };
 
 class Stage {
@@ -64,6 +81,7 @@ public:
 
 	std::shared_ptr<Sprite> create(const std::string& name);
 	void remove(const Sprite* s);
+	std::shared_ptr<Sprite> find(const std::string& name) const; // most recent sprite with that name
 	void update(float dt_ms);
 	// Visible sprites back-to-front as quads.
 	void build_draw_list(std::vector<DrawItem>& out) const;
