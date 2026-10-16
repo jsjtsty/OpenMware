@@ -1,0 +1,68 @@
+libtotono squirrel2 fork
+
+This directory contains a maintained fork of Squirrel 2.2.4, adapted for the
+current libtotono workspace.
+
+What changed
+------------
+
+- Modern CMake build.
+- C++20 compatibility.
+- Static and shared library builds.
+- Runtime ABI selection for 32-bit and 64-bit bytecode handling.
+- Internal warning cleanup and safer formatting helpers.
+
+Build requirements
+------------------
+
+- CMake 3.20 or newer.
+- A C++20-capable compiler.
+
+Current verified environment
+----------------------------
+
+- macOS with AppleClang 21.0.0.21000101.
+- CMake 3.20+.
+- Build modes verified:
+  - static library
+  - shared library
+
+Build usage
+-----------
+
+Top-level build:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+Shared library build:
+
+```bash
+cmake -S . -B build-shared -DSQUIRREL2_BUILD_SHARED=ON
+cmake --build build-shared
+```
+
+ABI selection
+-------------
+
+The VM can be created with an explicit ABI mode:
+
+- `sq_open_ex(initialstacksize, SQ_ABI_32)`
+- `sq_open_ex(initialstacksize, SQ_ABI_64)`
+- `sq_newthread_ex(friendvm, initialstacksize, abi)`
+- `sq_setabi(vm, abi)`
+- `sq_getabi(vm)`
+
+The runtime ABI is independent from the host compiler architecture. This lets
+the VM simulate 32-bit or 64-bit bytecode behavior explicitly.
+
+Notes
+-----
+
+- The public C API is exported through `squirrel.h`.
+- The library target is `squirrel2::squirrel2` when used from CMake.
+- Upstream Squirrel 2.2.4 attribution is preserved; this tree is a fork, not
+  a verbatim upstream snapshot.
+
