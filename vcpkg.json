@@ -8,6 +8,8 @@
     {
       "name": "sdl3-shadercross",
       "host": false
-    }
+    },
+    "libwebp",
+    "stb"
   ]
 }

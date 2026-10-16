@@ -85,16 +85,37 @@ SQInteger native_import(HSQUIRRELVM v) {
 	return 0;
 }
 
+std::string describe_arg(HSQUIRRELVM v, SQInteger idx) {
+	char buf[64];
+	switch (sq_gettype(v, idx)) {
+	case OT_NULL: return "null";
+	case OT_INTEGER: { SQInteger n = 0; sq_getinteger(v, idx, &n); std::snprintf(buf, sizeof buf, "%lld", static_cast<long long>(n)); return buf; }
+	case OT_FLOAT: { SQFloat f = 0; sq_getfloat(v, idx, &f); std::snprintf(buf, sizeof buf, "%g", static_cast<double>(f)); return buf; }
+	case OT_BOOL: { SQBool b = 0; sq_getbool(v, idx, &b); return b ? "true" : "false"; }
+	case OT_STRING: { const SQChar* s = ""; sq_getstring(v, idx, &s); return std::string("\"") + s + "\""; }
+	case OT_TABLE: return "{table}";
+	case OT_ARRAY: return "[array]";
+	case OT_INSTANCE: return "<instance>";
+	case OT_CLOSURE: case OT_NATIVECLOSURE: return "<function>";
+	default: return "<?>";
+	}
+}
+
 // Default behaviour of every native we have not implemented yet: log and return null.
 SQInteger native_stub(HSQUIRRELVM v) {
 	const SQChar* name = "?";
 	sq_getstring(v, -1, &name); // free variable 0 (pushed last by the VM)
 	ScriptHost* h = host_of(v);
 	const int count = ++h->stub_calls[name];
-	if (h->verbose || count == 1) {
-		std::string line = std::string("[stub] ") + name + " argc=" + std::to_string(sq_gettop(v) - 2);
+	if (h->verbose) {
+		std::string line = std::string("[stub] ") + name + "(";
+		const SQInteger argc = sq_gettop(v) - 2;
+		for (SQInteger i = 0; i < argc; i++) line += (i ? ", " : "") + describe_arg(v, 2 + i);
+		line += ")";
 		h->log.push_back(line);
-		if (h->verbose) std::puts(line.c_str());
+		std::puts(line.c_str());
+	} else if (count == 1) {
+		h->log.push_back(std::string("[stub] ") + name);
 	}
 	return 0;
 }
