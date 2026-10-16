@@ -31,6 +31,8 @@ int main(int argc, char** argv) {
 	std::vector<std::pair<int, std::string>> evals; // --eval FRAME:CODE (run a script snippet at a frame)
 	struct MouseCmd { int frame; float x, y; bool click; };
 	std::vector<MouseCmd> mouse_cmds; // --mouse FRAME:X:Y[:click]
+	struct AutoClick { int first, period; float x, y; };
+	std::vector<AutoClick> auto_clicks; // --auto FIRST:PERIOD:X:Y (a click every PERIOD frames from FIRST on)
 	std::vector<std::pair<int, std::string>> shots_at; // --shot-at FRAME:PATH (extra screenshots on the way, implies offscreen)
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
@@ -43,6 +45,10 @@ int main(int argc, char** argv) {
 		else if (a == "--shot-at" && i + 1 < argc) {
 			const std::string spec = argv[++i];
 			shots_at.emplace_back(std::atoi(spec.c_str()), spec.substr(spec.find(':') + 1));
+		}
+		else if (a == "--auto" && i + 1 < argc) {
+			AutoClick c{0, 60, 0, 0};
+			if (std::sscanf(argv[++i], "%d:%d:%f:%f", &c.first, &c.period, &c.x, &c.y) == 4 && c.period > 0) auto_clicks.push_back(c);
 		}
 		else if (a == "--eval" && i + 1 < argc) {
 			const std::string spec = argv[++i];
@@ -113,6 +119,11 @@ int main(int argc, char** argv) {
 			if (c.frame == frame) {
 				input.set_cursor(c.x, c.y);
 				if (c.click) input.tap_mouse();
+			}
+		for (const auto& c : auto_clicks)
+			if (frame >= c.first && (frame - c.first) % c.period == 0) {
+				input.set_cursor(c.x, c.y);
+				input.tap_mouse();
 			}
 		input.poll(gpu.window, Stage::kWidth, Stage::kHeight, 1000.f / 60.f);
 		if (input.quit) running = false;
