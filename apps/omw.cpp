@@ -110,7 +110,27 @@ int main(int argc, char** argv) {
 	host.input = &input;
 	DrawList items;
 	bool running = true;
-	for (int frame = 0; running && (frames < 0 || frame < frames); frame++) {
+	// Fixed-timestep loop: the game logic always advances in 1/60 s steps; rendering runs at the display's rate. A time accumulator
+	// decides how many logic steps are due per presented frame (none on a 144 Hz display half the time, several after a stall).
+	const bool realtime = frames < 0 && shot.empty() && shots_at.empty();
+	const Uint64 step_ns = 1000000000ull / 60;
+	Uint64 last_ns = SDL_GetTicksNS(), acc_ns = step_ns;
+	int catch_up = 0;
+	for (int frame = 0; running && (frames < 0 || frame < frames);) {
+		bool present = true;
+		if (realtime) {
+			const Uint64 now = SDL_GetTicksNS();
+			acc_ns += std::min<Uint64>(now - last_ns, 250000000ull); // after a long stall, do not fast-forward
+			last_ns = now;
+			if (acc_ns < step_ns) { // no step due: show the last frame again
+				if (items.empty()) SDL_DelayNS(1000000);
+				else renderer.render_frame(items);
+				continue;
+			}
+			acc_ns -= step_ns;
+			present = acc_ns < step_ns || ++catch_up >= 4; // behind: step again before presenting (at most 4 in a row)
+			if (present) catch_up = 0;
+		}
 		for (const auto& [f, k] : taps)
 			if (f == frame) input.tap_key(k);
 		for (const auto& [f, code] : evals)
@@ -148,10 +168,11 @@ int main(int argc, char** argv) {
 			}
 			renderer.save_frame_png(items, shot);
 			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.empty() ? size_t(0) : items.back().items.size(), stage.size());
-		} else if (shot.empty() && shots_at.empty()) {
+		} else if (shot.empty() && shots_at.empty() && present) {
 			renderer.render_frame(items);
 		}
 		if (host.app.closing) running = false;
+		frame++;
 	}
 
 	if (const char* code = std::getenv("OMW_EVAL_END")) host.debug_eval(code);
