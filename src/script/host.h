@@ -24,6 +24,7 @@ struct AppState {
 
 class Stage;
 class Renderer2D;
+class GameFiles;
 
 class ScriptHost {
 public:
@@ -32,6 +33,7 @@ public:
 	int frame = 0; // frames resumed so far
 	Stage* stage = nullptr;       // set by the game; null when running headless (scriptrun)
 	Renderer2D* renderer = nullptr;
+	const GameFiles* files = nullptr; // archive file system (media/...); save files live on the real disk
 
 	explicit ScriptHost(NpkArchive& scripts);
 	~ScriptHost();

@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
 	ScriptHost host(*files.archive("script"));
 	host.stage = &stage;
 	host.renderer = &renderer;
+	host.files = &files;
 	host.enable_discovery();
 	host.verbose = trace;
 	if (!host.import("media/script/main.nut", &err)) {
