@@ -1,3 +1,6 @@
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include "render/renderer2d.h"
 
 #include "render/blend.h"
@@ -232,27 +235,59 @@ void Renderer2D::destroy_dynamic_texture(Texture* t) {
 	}
 }
 
+namespace {
+bool read_disk_file(const std::string& path, std::vector<uint8_t>& out, long long* stamp) {
+	std::error_code ec;
+	const auto t = std::filesystem::last_write_time(std::filesystem::u8path(path), ec);
+	if (ec) return false;
+	if (stamp) *stamp = static_cast<long long>(t.time_since_epoch().count());
+	std::ifstream f(std::filesystem::u8path(path), std::ios::binary);
+	if (!f) return false;
+	out.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+	return !out.empty();
+}
+} // namespace
+
 Texture* Renderer2D::texture(const std::string& path) {
 	std::string key = path;
 	for (char& c : key) {
 		if (c == '\\') c = '/';
 		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
 	}
-	if (const auto it = textures_.find(key); it != textures_.end()) return it->second->gpu ? it->second.get() : nullptr;
-	auto tex = std::make_unique<Texture>();
+	// "file:///dir/name": a picture on disk (save-file thumbnails), reloaded in place when the file changes.
+	const bool on_disk = key.rfind("file:///", 0) == 0;
+	const std::string disk_path = on_disk ? path.substr(8) : std::string();
+	auto it = textures_.find(key);
+	if (it != textures_.end()) {
+		if (!on_disk) return it->second->gpu ? it->second.get() : nullptr;
+		std::error_code ec;
+		const auto t = std::filesystem::last_write_time(std::filesystem::u8path(disk_path), ec);
+		if (!ec && static_cast<long long>(t.time_since_epoch().count()) == disk_stamp_[key]) return it->second->gpu ? it->second.get() : nullptr;
+	}
 	std::vector<uint8_t> file;
 	Image img;
-	if (files_->read(path, file) && decode_image(file, img)) {
-		tex->gpu = gpu_->create_texture_rgba8(img.w, img.h, img.rgba.data());
-		tex->w = img.w;
-		tex->h = img.h;
-		tex->alpha.resize(static_cast<size_t>(img.w) * img.h);
-		for (size_t i = 0; i < tex->alpha.size(); i++) tex->alpha[i] = img.rgba[i * 4 + 3];
+	long long stamp = 0;
+	const bool loaded = on_disk ? read_disk_file(disk_path, file, &stamp) && decode_image(file, img) : files_->read(path, file) && decode_image(file, img);
+	Texture* raw;
+	if (it != textures_.end()) {
+		raw = it->second.get();
+		if (raw->gpu) SDL_ReleaseGPUTexture(gpu_->device, raw->gpu);
+		raw->gpu = nullptr;
 	} else {
+		auto tex = std::make_unique<Texture>();
+		raw = tex.get();
+		textures_[key] = std::move(tex);
+	}
+	if (loaded) {
+		raw->gpu = gpu_->create_texture_rgba8(img.w, img.h, img.rgba.data());
+		raw->w = img.w;
+		raw->h = img.h;
+		raw->alpha.resize(static_cast<size_t>(img.w) * img.h);
+		for (size_t i = 0; i < raw->alpha.size(); i++) raw->alpha[i] = img.rgba[i * 4 + 3];
+		if (on_disk) disk_stamp_[key] = stamp;
+	} else if (!on_disk) {
 		std::fprintf(stderr, "[texture] cannot load %s\n", path.c_str());
 	}
-	Texture* raw = tex.get();
-	textures_[key] = std::move(tex);
 	return raw->gpu ? raw : nullptr;
 }
 
@@ -603,6 +638,35 @@ bool Renderer2D::save_frame_png(const DrawList& list, const std::string& path) {
 	SDL_Surface* surf = SDL_CreateSurfaceFrom(fw, fh, SDL_PIXELFORMAT_RGBA32, data, fw * 4);
 	const bool ok = SDL_SavePNG(surf, path.c_str());
 	SDL_DestroySurface(surf);
+	SDL_UnmapGPUTransferBuffer(gpu_->device, tb);
+	SDL_ReleaseGPUTransferBuffer(gpu_->device, tb);
+	return ok;
+}
+
+bool Renderer2D::save_texture_png(Texture* t, int w, int h, const std::string& path) {
+	if (!t || !t->gpu || w <= 0 || h <= 0) return false;
+	SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(gpu_->device);
+	const Uint32 bytes = static_cast<Uint32>(t->w) * t->h * 4;
+	SDL_GPUTransferBufferCreateInfo tbi{SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD, bytes, 0};
+	SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(gpu_->device, &tbi);
+	SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
+	SDL_GPUTextureRegion reg{};
+	reg.texture = t->gpu;
+	reg.w = static_cast<Uint32>(t->w);
+	reg.h = static_cast<Uint32>(t->h);
+	reg.d = 1;
+	SDL_GPUTextureTransferInfo dst{tb, 0, 0, 0};
+	SDL_DownloadFromGPUTexture(cp, &reg, &dst);
+	SDL_EndGPUCopyPass(cp);
+	SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+	SDL_WaitForGPUFences(gpu_->device, true, &fence, 1);
+	SDL_ReleaseGPUFence(gpu_->device, fence);
+	void* data = SDL_MapGPUTransferBuffer(gpu_->device, tb, false);
+	SDL_Surface* src = SDL_CreateSurfaceFrom(t->w, t->h, SDL_PIXELFORMAT_RGBA32, data, t->w * 4);
+	SDL_Surface* scaled = src ? SDL_ScaleSurface(src, w, h, SDL_SCALEMODE_LINEAR) : nullptr;
+	const bool ok = scaled && SDL_SavePNG(scaled, path.c_str());
+	if (scaled) SDL_DestroySurface(scaled);
+	if (src) SDL_DestroySurface(src);
 	SDL_UnmapGPUTransferBuffer(gpu_->device, tb);
 	SDL_ReleaseGPUTransferBuffer(gpu_->device, tb);
 	return ok;

@@ -147,6 +147,13 @@ SQInteger target_is_capture(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->is_capture &
 SQInteger target_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
 SQInteger target_true(HSQUIRRELVM v) { sq_pushbool(v, SQTrue); return 1; }
 SQInteger target_noop(HSQUIRRELVM) { return 0; }
+// saveImage(file, w, h, mode): writes what the sprite's surface holds (a screen snapshot, a surface) as a scaled PNG.
+SQInteger save_image(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	if (!s || !s->texture || !host().renderer) return 0;
+	host().renderer->save_texture_png(s->texture, static_cast<int>(arg_int(v, 3)), static_cast<int>(arg_int(v, 4)), arg_string(v, 2));
+	return 0;
+}
 
 SQInteger set_surface(HSQUIRRELVM v) { // (target sprite name; "null"/empty: the screen)
 	const std::string name = arg_string(v, 2);
@@ -518,17 +525,19 @@ static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool 
 		h.add_method("pause", target_stop);
 		h.add_method("stop", target_stop);
 		h.add_method("isCaptureEnabled", target_is_capture);
+		h.add_method("saveImage", save_image);
 		h.add_method("isDelayedRendering", target_false);
 		h.add_method("serialize", target_true); // save files keep no native state: the scripts rebuild the surface
 		h.add_method("deserialize", target_true);
 		for (const char* n : {"setDelayRendering", "setCaptureTarget", "setCopyTarget", "createCustomEffect", "setCustomEffectParameter",
-							  "saveImage", "clear", "setBlurMode", "setTextureFiltering"})
+							  "clear", "setBlurMode", "setTextureFiltering"})
 			h.add_method(n, target_noop);
 	} else {
 		h.add_method("create", create);
 		h.add_method("createSubresource", create);
 		h.add_method("createColor", create_color);
 		h.add_method("createScreen", create_screen);
+		h.add_method("saveImage", save_image);
 		register_movie_methods(h);
 	}
 	h.add_method("setSurface", set_surface);

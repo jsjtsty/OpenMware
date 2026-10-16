@@ -37,6 +37,8 @@ public:
 	bool render_frame(const DrawList& list);
 	// Renders only into the offscreen game frame and saves it as PNG (for tests/screenshots).
 	bool save_frame_png(const DrawList& list, const std::string& path);
+	// Reads a texture back, scales it to w x h and saves it as PNG (save-file thumbnails).
+	bool save_texture_png(Texture* t, int w, int h, const std::string& path);
 
 private:
 	struct Vertex {
@@ -79,6 +81,7 @@ private:
 	std::vector<std::unique_ptr<Texture>> dynamic_;
 	FontLibrary fonts_;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
+	std::unordered_map<std::string, long long> disk_stamp_; // file:/// textures: modification time they were loaded at
 	std::map<std::pair<int, std::string>, SDL_GPUGraphicsPipeline*> pipelines_; // key: blend | flags << 8
 	std::map<std::string, SDL_GPUShader*> shaders_;
 	std::vector<Vertex> verts_;
