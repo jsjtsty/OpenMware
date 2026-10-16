@@ -289,6 +289,14 @@ bool ScriptHost::resume_frame(std::string* error) {
 
 void ScriptHost::enable_discovery() { discovery = true; }
 
+void ScriptHost::debug_eval(const char* code) {
+	if (SQ_SUCCEEDED(sq_compilebuffer(vm_, code, static_cast<SQInteger>(std::strlen(code)), "OMW_EVAL", SQTrue))) {
+		sq_pushroottable(vm_);
+		sq_call(vm_, 1, SQFalse, SQFalse);
+		sq_pop(vm_, 1);
+	}
+}
+
 void ScriptHost::begin_class(const char* script_name) {
 	building_ = script_name;
 	real_classes_.insert(building_);

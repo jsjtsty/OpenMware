@@ -33,7 +33,7 @@ include(cmake/OmwShaders.cmake)
 find_package(WebP CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_image.h" REQUIRED)
 
-add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/text_markup.cpp src/game/stage.cpp src/game/game_files.cpp)
+add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/text_markup.cpp src/game/input.cpp src/game/stage.cpp src/game/game_files.cpp)
 target_include_directories(omw_game PUBLIC src)
 target_link_libraries(omw_game PUBLIC omw_archive SDL3::SDL3)
 

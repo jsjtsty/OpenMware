@@ -93,6 +93,14 @@ void register_global_natives(ScriptHost& h) {
 	h.add_global("SetSavePathRoot", set_save_root);
 	h.add_global("GetTempPathRoot", get_temp_root);
 	h.add_global("SystemCall", system_call);
+	h.add_global("OMW_Stack", [](HSQUIRRELVM v) -> SQInteger { // debugging aid: print the call stack of a script thread
+		HSQUIRRELVM t = nullptr;
+		if (SQ_FAILED(sq_getthread(v, 2, &t)) || !t) return 0;
+		SQStackInfos si;
+		for (SQInteger lvl = 0; SQ_SUCCEEDED(sq_stackinfos(t, lvl, &si)); lvl++)
+			std::fprintf(stderr, "    at %s (%s:%d)\n", si.funcname ? si.funcname : "?", si.source ? si.source : "?", static_cast<int>(si.line));
+		return 0;
+	});
 	h.add_global("OMW_Log", [](HSQUIRRELVM v) -> SQInteger { std::fprintf(stderr, "%s", sqb::arg_string(v, 2).c_str()); return 0; }); // debugging aid for OMW_EVAL
 	h.add_global("CountTextLength", count_text_length);
 	h.add_global("SetClearTrue", [](HSQUIRRELVM) -> SQInteger { return 0; }); // platform achievement hook (Steam); nothing to do here

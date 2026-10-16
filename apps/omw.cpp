@@ -1,6 +1,7 @@
 // omw: runs the game. Usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]
 //   --frames N  stop after N frames;  --shot FILE  with --frames: save the last frame as PNG (offscreen, no presentation)
 #include "game/game_files.h"
+#include "game/input.h"
 #include "game/stage.h"
 #include "render/gpu.h"
 #include "render/renderer2d.h"
@@ -21,6 +22,7 @@ int main(int argc, char** argv) {
 	int frames = -1;
 	bool trace = false;
 	std::string shot;
+	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
 		const std::string a = argv[i];
 		if (a == "--keys" && i + 1 < argc) keys = argv[++i];
@@ -28,6 +30,10 @@ int main(int argc, char** argv) {
 		else if (a == "--frames" && i + 1 < argc) frames = std::atoi(argv[++i]);
 		else if (a == "--shot" && i + 1 < argc) shot = argv[++i];
 		else if (a == "--trace") trace = true;
+		else if (a == "--press" && i + 1 < argc) {
+			int f = 0, k = 0;
+			if (std::sscanf(argv[++i], "%d:%d", &f, &k) == 2) taps.emplace_back(f, k);
+		}
 	}
 
 	std::string err;
@@ -60,12 +66,15 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	InputState input;
+	host.input = &input;
 	std::vector<DrawItem> items;
 	bool running = true;
 	for (int frame = 0; running && (frames < 0 || frame < frames); frame++) {
-		SDL_Event e;
-		while (SDL_PollEvent(&e))
-			if (e.type == SDL_EVENT_QUIT) running = false;
+		for (const auto& [f, k] : taps)
+			if (f == frame) input.tap_key(k);
+		input.poll(gpu.window, Stage::kWidth, Stage::kHeight, 1000.f / 60.f);
+		if (input.quit) running = false;
 		if (!host.resume_frame(&err)) {
 			std::fprintf(stderr, "script error at frame %d: %s\n", frame, err.c_str());
 			break;
@@ -84,6 +93,7 @@ int main(int argc, char** argv) {
 		if (host.app.closing) running = false;
 	}
 
+	if (const char* code = std::getenv("OMW_EVAL_END")) host.debug_eval(code);
 	std::printf("stubs called:\n");
 	for (const auto& [name, n] : host.stub_calls) std::printf("  %5d  %s\n", n, name.c_str());
 	host.renderer = nullptr; // script objects are released later; they must not touch the renderer any more

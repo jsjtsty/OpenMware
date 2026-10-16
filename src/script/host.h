@@ -24,6 +24,7 @@ struct AppState {
 
 class Stage;
 class Renderer2D;
+struct InputState;
 class GameFiles;
 
 class ScriptHost {
@@ -33,6 +34,7 @@ public:
 	int frame = 0; // frames resumed so far
 	Stage* stage = nullptr;       // set by the game; null when running headless (scriptrun)
 	Renderer2D* renderer = nullptr;
+	InputState* input = nullptr;
 	const GameFiles* files = nullptr; // archive file system (media/...); save files live on the real disk
 
 	explicit ScriptHost(NpkArchive& scripts);
@@ -57,6 +59,8 @@ public:
 	bool verbose = false;
 	// Discovery mode: unknown root-table names resolve to logging stubs instead of raising errors.
 	void enable_discovery();
+	// Debugging aid: compiles and runs a snippet with the root table as `this` (see OMW_EVAL / OMW_EVAL_END).
+	void debug_eval(const char* code);
 	bool discovery = false;
 	std::map<std::string, int> missing;
 
