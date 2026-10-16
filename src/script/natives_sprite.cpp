@@ -162,6 +162,7 @@ SQInteger get_fade(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fade.value[0]); retu
 
 SQInteger move(HSQUIRRELVM v) { // (x, y, time_ms, tempo)
 	Sprite* s = spr(v);
+	TRACE_SPRITE("[f%d] [sprite %s] move %g %g t=%g\n", host().frame, s->name.c_str(), arg_float(v, 2), arg_float(v, 3), arg_float(v, 4));
 	s->move.start({arg_float(v, 2), arg_float(v, 3), s->move.value[2]}, arg_float(v, 4), static_cast<int>(arg_int(v, 5)));
 	return 0;
 }
@@ -172,6 +173,7 @@ SQInteger move3d(HSQUIRRELVM v) { // (x, y, z, time_ms, tempo)
 SQInteger get_move(HSQUIRRELVM v) {
 	const Sprite* s = spr(v);
 	for (int i = 0; i < 3; i++) set_ret(v, i + 1, s->move.value[i]);
+	TRACE_SPRITE("[f%d] [sprite %s] getMove %g %g\n", host().frame, s->name.c_str(), s->move.value[0], s->move.value[1]);
 	return 0;
 }
 
@@ -352,7 +354,31 @@ SQInteger set_shading_parameter(HSQUIRRELVM v) { // (level, density)
 SQInteger get_shading_level(HSQUIRRELVM v) { sq_pushinteger(v, spr(v)->fx.shade_level); return 1; }
 SQInteger get_shading_density(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.shade_density); return 1; }
 
+// setXTimer(ms): jumps the animation to that point; getXTimer(): elapsed ms (used when saving).
+template <auto M> SQInteger anim_set_timer(HSQUIRRELVM v) {
+	(spr(v)->*M).set_timer(arg_float(v, 2));
+	return 0;
+}
+template <auto M> SQInteger anim_get_timer(HSQUIRRELVM v) {
+	const auto& a = spr(v)->*M;
+	sq_pushfloat(v, a.active ? a.timer : 0.f);
+	return 1;
+}
+SQInteger is_shaking(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
+
 static void register_effect_methods(ScriptHost& h) {
+	h.add_method("setFadeTimer", anim_set_timer<&Sprite::fade>);
+	h.add_method("getFadeTimer", anim_get_timer<&Sprite::fade>);
+	h.add_method("setMoveTimer", anim_set_timer<&Sprite::move>);
+	h.add_method("getMoveTimer", anim_get_timer<&Sprite::move>);
+	h.add_method("setScaleTimer", anim_set_timer<&Sprite::scale>);
+	h.add_method("getScaleTimer", anim_get_timer<&Sprite::scale>);
+	h.add_method("setRotateTimer", anim_set_timer<&Sprite::rotate>);
+	h.add_method("getRotateTimer", anim_get_timer<&Sprite::rotate>);
+	h.add_method("setScrollTimer", anim_set_timer<&Sprite::scroll>);
+	h.add_method("getScrollTimer", anim_get_timer<&Sprite::scroll>);
+	h.add_method("isShaking", is_shaking);
+	h.add_method("setActionCompatibleMode", ret_null);
 	h.add_method("setColorHue", fx_set<&Sprite::Effects::hue>);
 	h.add_method("getColorHue", fx_get<&Sprite::Effects::hue>);
 	h.add_method("getColorHueTimer", fx_timer<&Sprite::Effects::hue>);

@@ -24,6 +24,7 @@ void Sprite::update(float dt_ms) {
 	rotate.update(dt);
 	fade.update(dt);
 	scroll.update(dt);
+	trans.update(dt);
 	for (auto& c : color) c.update(dt);
 	fx.update(dt);
 }
@@ -260,9 +261,10 @@ void Stage::update_pointer(float x, float y) {
 
 void Stage::dump() const {
 	for (const auto& s : sprites_)
-		std::printf("  sprite %-28s kind=%d prio=%d fade=%.2f pos=(%.0f,%.0f) size=%.0fx%.0f scale=(%.2f,%.2f) tex=%d erase=%d\n", s->name.c_str(),
+		std::printf("  sprite %-28s kind=%d prio=%d fade=%.2f pos=(%.0f,%.0f) size=%.0fx%.0f scale=(%.2f,%.2f) tex=%d erase=%d trans=%.2f/%d fadeanim=%d moveanim=%d\n", s->name.c_str(),
 					static_cast<int>(s->kind), s->priority, s->fade.value[0], s->move.value[0], s->move.value[1], s->width, s->height,
-					s->scale.value[0], s->scale.value[1], s->texture ? 1 : 0, s->erase ? 1 : 0);
+					s->scale.value[0], s->scale.value[1], s->texture ? 1 : 0, s->erase ? 1 : 0, s->trans.value[0], s->trans.active ? 1 : 0, s->fade.active ? 1 : 0,
+					s->move.active ? 1 : 0);
 }
 
 } // namespace omw

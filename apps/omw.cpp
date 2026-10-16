@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
 	std::vector<std::pair<int, std::string>> evals; // --eval FRAME:CODE (run a script snippet at a frame)
 	struct MouseCmd { int frame; float x, y; bool click; };
 	std::vector<MouseCmd> mouse_cmds; // --mouse FRAME:X:Y[:click]
+	std::vector<std::pair<int, std::string>> shots_at; // --shot-at FRAME:PATH (extra screenshots on the way, implies offscreen)
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
 		const std::string a = argv[i];
@@ -39,6 +40,10 @@ int main(int argc, char** argv) {
 		else if (a == "--frames" && i + 1 < argc) frames = std::atoi(argv[++i]);
 		else if (a == "--shot" && i + 1 < argc) shot = argv[++i];
 		else if (a == "--trace") trace = true;
+		else if (a == "--shot-at" && i + 1 < argc) {
+			const std::string spec = argv[++i];
+			shots_at.emplace_back(std::atoi(spec.c_str()), spec.substr(spec.find(':') + 1));
+		}
 		else if (a == "--eval" && i + 1 < argc) {
 			const std::string spec = argv[++i];
 			evals.emplace_back(std::atoi(spec.c_str()), spec.substr(spec.find(':') + 1));
@@ -120,6 +125,8 @@ int main(int argc, char** argv) {
 		audio.update(1000.f / 60.f);
 		items.clear();
 		stage.build_draw_list(items);
+		for (const auto& [f, path] : shots_at)
+			if (f == frame) renderer.save_frame_png(items, path);
 		const bool last = frames >= 0 && frame == frames - 1;
 		if (last && !shot.empty()) {
 			if (trace) {
@@ -130,7 +137,7 @@ int main(int argc, char** argv) {
 			}
 			renderer.save_frame_png(items, shot);
 			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.empty() ? size_t(0) : items.back().items.size(), stage.size());
-		} else if (shot.empty()) {
+		} else if (shot.empty() && shots_at.empty()) {
 			renderer.render_frame(items);
 		}
 		if (host.app.closing) running = false;

@@ -32,6 +32,12 @@ struct Anim {
 		if (!active) value = dst;
 	}
 	void set(const std::array<float, N>& v) { value = src = dst = v; active = false; }
+	// Jumps the running animation to `t` ms after its start (skip / fast-forward); no effect when it is not running.
+	void set_timer(float t_ms) {
+		if (!active) return;
+		timer = 0;
+		update(std::max(0.f, t_ms));
+	}
 	void update(float dt_ms) {
 		if (!active) return;
 		timer = std::min(timer + dt_ms, duration);

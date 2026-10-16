@@ -95,7 +95,7 @@ SQInteger is_full_screen(HSQUIRRELVM v) { sq_pushbool(v, app().full_screen); ret
 SQInteger create_directory(HSQUIRRELVM v) {
 	std::error_code ec;
 	std::filesystem::create_directories(std::filesystem::u8path(arg_string(v, 2)), ec);
-	sq_pushbool(v, !ec);
+	sq_pushinteger(v, ec ? -1 : 0); // 0 = success, like the other natives
 	return 1;
 }
 
