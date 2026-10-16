@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <set>
@@ -24,6 +25,7 @@ void Sprite::update(float dt_ms) {
 	fade.update(dt);
 	scroll.update(dt);
 	for (auto& c : color) c.update(dt);
+	fx.update(dt);
 }
 
 std::shared_ptr<Sprite> Stage::create(const std::string& name) {
@@ -129,18 +131,88 @@ void Stage::build_draw_list(DrawList& out) const {
 	});
 
 	// Sprites per surface (null: the game frame), then the passes with the surfaces a surface contains first.
-	std::map<const Sprite*, std::vector<std::pair<const Sprite*, DrawItem>>> buckets;
+	struct Entry {
+		const Sprite* s;
+		DrawItem item;
+		std::vector<RenderPass> pre; // effect chain that has to run before the pass this item is drawn in
+	};
+	std::map<const Sprite*, std::vector<Entry>> buckets;
+	int next_temp = 0;
 	for (const Sprite* s : order) {
 		const auto t = s->surface.lock();
 		const Sprite* target = t && t->is_target && !t->released && t.get() != s && t->texture ? t.get() : nullptr;
-		buckets[target].emplace_back(s, make_item(s));
+		const int w = target ? target->texture->w : kWidth, h = target ? target->texture->h : kHeight;
+		Entry e{s, make_item(s), {}};
+		if (s->fx.any() && e.item.snap == DrawItem::Snap::None) {
+			// Draw the sprite alone into a temporary texture, run the effects over it, then composite the result.
+			const int a = next_temp++, b = next_temp++;
+			int cur = a;
+			RenderPass draw;
+			draw.temp_target = a;
+			draw.w = w;
+			draw.h = h;
+			DrawItem single = e.item;
+			single.blend = BLEND_NORMAL;
+			single.a = 1.f;
+			draw.items.push_back(single);
+			e.pre.push_back(std::move(draw));
+			auto effect = [&](RenderPass::Op op, int in, int dst) {
+				RenderPass p;
+				p.op = op;
+				p.in_temp = in;
+				p.temp_target = dst;
+				p.w = w;
+				p.h = h;
+				return p;
+			};
+			if (const float shade = s->fx.shade.value[0]; shade > 0.f) {
+				const float sigma = shade * (10.f + 8.f * static_cast<float>(s->fx.shade_level));
+				RenderPass bx = effect(RenderPass::Op::Blur, cur, b);
+				bx.p[0] = 1.f / static_cast<float>(w);
+				bx.p[2] = sigma;
+				RenderPass by = effect(RenderPass::Op::Blur, b, cur);
+				by.p[1] = 1.f / static_cast<float>(h);
+				by.p[2] = sigma;
+				e.pre.push_back(std::move(bx));
+				e.pre.push_back(std::move(by));
+			}
+			if (s->fx.any_color()) {
+				RenderPass c = effect(RenderPass::Op::Color, cur, cur == a ? b : a);
+				c.p[0] = s->fx.hue.value[0];
+				c.p[1] = s->fx.saturation.value[0];
+				c.p[2] = s->fx.brightness.value[0];
+				c.p[3] = s->fx.glow.value[0];
+				c.p[4] = s->fx.sepia.value[0];
+				c.p[5] = s->fx.nega.value[0];
+				c.p[6] = s->fx.mono.value[0];
+				c.p[8] = s->fx.mono_cb;
+				c.p[9] = s->fx.mono_cr;
+				cur = c.temp_target;
+				e.pre.push_back(std::move(c));
+			}
+			DrawItem comp;
+			comp.x[0] = comp.x[3] = comp.y[0] = comp.y[1] = 0.f;
+			comp.x[1] = comp.x[2] = static_cast<float>(w);
+			comp.y[2] = comp.y[3] = static_cast<float>(h);
+			comp.u[0] = comp.u[3] = comp.v[0] = comp.v[1] = 0.f;
+			comp.u[1] = comp.u[2] = comp.v[2] = comp.v[3] = 1.f;
+			for (int i = 0; i < 4; i++) comp.r[i] = comp.g[i] = comp.b[i] = 1.f;
+			comp.a = e.item.a;
+			comp.blend = s->blend;
+			comp.premult = true;
+			comp.temp = cur;
+			e.item = comp;
+		}
+		buckets[target].push_back(std::move(e));
 	}
 	std::set<const Sprite*> emitted;
 	std::function<void(const Sprite*, int)> emit = [&](const Sprite* target, int depth) {
 		if (!emitted.insert(target).second || depth > 16) return;
 		auto& list = buckets[target];
-		for (const auto& [s, item] : list)
-			if (s->is_target && !s->is_capture) emit(s, depth + 1);
+		for (const auto& e : list)
+			if (e.s->is_target && !e.s->is_capture) emit(e.s, depth + 1);
+		for (auto& e : list)
+			for (auto& p : e.pre) out.push_back(std::move(p));
 		RenderPass pass;
 		if (target) {
 			pass.target = target->texture;
@@ -150,7 +222,7 @@ void Stage::build_draw_list(DrawList& out) const {
 			pass.w = kWidth;
 			pass.h = kHeight;
 		}
-		for (auto& [s, item] : list) pass.items.push_back(std::move(item));
+		for (auto& e : list) pass.items.push_back(std::move(e.item));
 		out.push_back(std::move(pass));
 	};
 	emit(nullptr, 0); // surfaces whose own parent is invisible are not reached, and so not drawn

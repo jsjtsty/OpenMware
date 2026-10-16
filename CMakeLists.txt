@@ -77,6 +77,9 @@ foreach(_row IN LISTS _omw_shader_rows)
 		omw_add_shader(NAME ${_base}.${_ext} STAGE ${_stage} SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/${_file} DEFINES ${_defs})
 	endif()
 endforeach()
+# OpenMware's own sprite effect shaders (blur, colour adjustments).
+omw_add_shader(NAME psfx_blur.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_BLUR)
+omw_add_shader(NAME psfx_color.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_COLOR)
 add_custom_target(omw_shaders DEPENDS ${_omw_all_shader_outputs})
 
 add_executable(gpu_demo apps/gpu_demo.cpp)

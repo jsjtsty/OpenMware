@@ -53,6 +53,24 @@ struct Sprite {
 	// a capture target instead copies what has been drawn below it (shake / filter sprites), while `capturing`.
 	bool is_target = false, is_capture = false, capturing = true;
 	std::weak_ptr<Sprite> surface; // SetSurface: the target this sprite is drawn into (none: the screen)
+
+	// Post effects of the sprite's picture (values as the scripts give them after their /1000 scaling).
+	struct Effects {
+		Anim<1> hue, saturation, brightness, glow; // pshsv: hue shift 0..1, saturation/brightness added, glow added to the value
+		Anim<1> sepia, nega, mono;                 // 0..1 mixes
+		Anim<1> shade;                             // "shading": soft-focus blur strength 0..1 (guess, see docs/render-notes.md)
+		float mono_cb = 0, mono_cr = 0;
+		int shade_level = 0;                       // SHADE_LEVEL_LOW/MIDDLE/HIGH = 0/2/4
+		float shade_density = 0;
+		bool any_color() const {
+			return hue.value[0] != 0 || saturation.value[0] != 0 || brightness.value[0] != 0 || glow.value[0] != 0 || sepia.value[0] > 0 ||
+				   nega.value[0] > 0 || mono.value[0] > 0;
+		}
+		bool any() const { return any_color() || shade.value[0] > 0; }
+		void update(float dt) {
+			for (Anim<1>* a : {&hue, &saturation, &brightness, &glow, &sepia, &nega, &mono, &shade}) a->update(dt);
+		}
+	} fx;
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
 	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)
@@ -82,13 +100,21 @@ struct DrawItem : DrawQuad {
 	enum class Snap { None, Screen, Capture } snap = Snap::None;
 	float rx = 0, ry = 0, rw = 0, rh = 0;
 	bool premult = false; // the texture is an offscreen surface (premultiplied alpha)
+	int temp = -1;        // >= 0: the picture is the renderer's temporary texture of that slot (result of an effect chain)
 };
 
-// One render pass: the items drawn into `target` (null: the game frame) in order.
+// One render pass. Draw: the items drawn into `target` (null: the game frame) or temporary slot `temp_target`, in order.
+// Blur/Color: a post effect of temporary slot `in_temp` written to `temp_target`.
 struct RenderPass {
+	enum class Op { Draw, Blur, Color } op = Op::Draw;
 	Texture* target = nullptr;
+	int temp_target = -1;
+	int in_temp = -1;
 	int w = 0, h = 0;
 	std::vector<DrawItem> items;
+	// Blur: p[0..1] = step in UV, p[2] = sigma in texels.  Color: p[0..3] hue/saturation/value/glow, p[4..6] sepia/nega/mono,
+	// p[8..9] mono cb/cr.
+	float p[12] = {};
 };
 using DrawList = std::vector<RenderPass>; // surfaces first, the game frame last
 

@@ -1,0 +1,9 @@
+::k <- SQSprite("k"); ::k.createColor(1024,576,20,20,60); ::k.setPriority(29000);
+::a <- SQSprite("a"); ::a.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::a.setPriority(29500);
+::a.scale(0.5, 0.5, 0, 0); ::a.move(-256, -144, 0, 0);
+::b <- SQSprite("b"); ::b.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::b.setPriority(29501);
+::b.scale(0.5, 0.5, 0, 0); ::b.move(256, -144, 0, 0); ::b.setShadingParameter(2, 0.1); ::b.setShadingPower(0.9, 0, 0);
+::c <- SQSprite("c"); ::c.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::c.setPriority(29502);
+::c.scale(0.5, 0.5, 0, 0); ::c.move(-256, 144, 0, 0); ::c.setColorHue(0.3, 0, 0); ::c.setColorSaturation(0.2, 0, 0);
+::d <- SQSprite("d"); ::d.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::d.setPriority(29503);
+::d.scale(0.5, 0.5, 0, 0); ::d.move(256, 144, 0, 0); ::d.setSepiaPower(1.0, 0, 0);

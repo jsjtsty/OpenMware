@@ -71,6 +71,8 @@ bool Renderer2D::init(GpuContext& gpu, const GameFiles& files, std::string* erro
 	si.min_filter = si.mag_filter = SDL_GPU_FILTER_LINEAR;
 	si.address_mode_u = si.address_mode_v = si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
 	sampler_linear_ = SDL_CreateGPUSampler(gpu.device, &si);
+	si.min_filter = si.mag_filter = SDL_GPU_FILTER_NEAREST;
+	sampler_point_ = SDL_CreateGPUSampler(gpu.device, &si);
 
 	SDL_GPUTextureCreateInfo ti{};
 	ti.type = SDL_GPU_TEXTURETYPE_2D;
@@ -109,6 +111,49 @@ Renderer2D::Scratch& Renderer2D::scratch(int w, int h) {
 	return s;
 }
 
+Texture* Renderer2D::temp_texture(int slot, int w, int h) {
+	if (slot >= static_cast<int>(temps_.size())) temps_.resize(slot + 1, nullptr);
+	Texture*& t = temps_[slot];
+	if (t && (t->w != w || t->h != h)) {
+		destroy_dynamic_texture(t);
+		t = nullptr;
+	}
+	if (!t) t = create_target(w, h);
+	return t;
+}
+
+// Post effect pipelines (fx.hlsl): fullscreen quad of the sprite vertex format, result written as is (no blending).
+SDL_GPUGraphicsPipeline* Renderer2D::fx_pipeline(bool blur) {
+	SDL_GPUGraphicsPipeline*& pipe = fx_pipes_[blur ? 1 : 0];
+	if (pipe) return pipe;
+	const char* name = blur ? "psfx_blur.frag" : "psfx_color.frag";
+	SDL_GPUShader* ps = gpu_->load_shader(name, SDL_GPU_SHADERSTAGE_FRAGMENT, 2, 0);
+	if (!ps) {
+		std::fprintf(stderr, "[render] missing pixel shader %s\n", name);
+		return nullptr;
+	}
+	shaders_[name] = ps;
+	SDL_GPUVertexBufferDescription vb{0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0};
+	SDL_GPUVertexAttribute attrs[3] = {
+		{0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, 0},
+		{1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, 16},
+		{2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, 32},
+	};
+	SDL_GPUColorTargetDescription ct{};
+	ct.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+	ct.blend_state = blend_state(BLEND_DISABLE, true);
+	SDL_GPUGraphicsPipelineCreateInfo pi{};
+	pi.vertex_shader = vs_;
+	pi.fragment_shader = ps;
+	pi.vertex_input_state = {&vb, 1, attrs, 3};
+	pi.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+	pi.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+	pi.target_info = {&ct, 1, SDL_GPU_TEXTUREFORMAT_INVALID, false};
+	pipe = SDL_CreateGPUGraphicsPipeline(gpu_->device, &pi);
+	if (!pipe) std::fprintf(stderr, "[render] cannot create %s pipeline: %s\n", name, SDL_GetError());
+	return pipe;
+}
+
 Texture* Renderer2D::create_target(int w, int h) {
 	auto t = std::make_unique<Texture>();
 	SDL_GPUTextureCreateInfo ti{};
@@ -130,6 +175,8 @@ Texture* Renderer2D::create_target(int w, int h) {
 void Renderer2D::shutdown() {
 	if (!gpu_ || !gpu_->device) return;
 	for (auto& [k, p] : pipelines_) if (p) SDL_ReleaseGPUGraphicsPipeline(gpu_->device, p);
+	for (auto& p : fx_pipes_) if (p) SDL_ReleaseGPUGraphicsPipeline(gpu_->device, p);
+	temps_.clear();
 	for (auto& [k, s] : shaders_) if (s) SDL_ReleaseGPUShader(gpu_->device, s);
 	for (auto& [k, t] : textures_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
 	for (auto& t : dynamic_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
@@ -144,6 +191,10 @@ void Renderer2D::shutdown() {
 	}
 	scratch_.clear();
 	if (sampler_linear_) SDL_ReleaseGPUSampler(gpu_->device, sampler_linear_);
+	if (sampler_point_) SDL_ReleaseGPUSampler(gpu_->device, sampler_point_);
+	for (SDL_GPUTexture* t : fx_params_) if (t) SDL_ReleaseGPUTexture(gpu_->device, t);
+	fx_params_.clear();
+	if (ptransfer_) SDL_ReleaseGPUTransferBuffer(gpu_->device, ptransfer_);
 	if (vs_) SDL_ReleaseGPUShader(gpu_->device, vs_);
 	pipelines_.clear();
 	shaders_.clear();
@@ -286,6 +337,18 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			for (int i : {0, 1, 2, 0, 2, 3}) verts_.push_back(q[i]);
 		};
 		pass_base[pi] = verts_.size();
+		if (ps.op != RenderPass::Op::Draw) { // effect: one fullscreen quad
+			DrawQuad q;
+			const float xs[4] = {0, w, w, 0}, ys[4] = {0, 0, h, h}, us[4] = {0, 1, 1, 0}, vs[4] = {0, 0, 1, 1};
+			for (int i = 0; i < 4; i++) {
+				q.x[i] = xs[i];
+				q.y[i] = ys[i];
+				q.u[i] = us[i];
+				q.v[i] = vs[i];
+				q.r[i] = q.g[i] = q.b[i] = 1.f;
+			}
+			push_quad(q, nullptr);
+		}
 		for (const DrawItem& d : ps.items) push_quad(d, &d);
 		mask_first[pi].assign(ps.items.size(), 0);
 		for (size_t i = 0; i < ps.items.size(); i++) {
@@ -309,6 +372,52 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 		SDL_EndGPUCopyPass(cp);
 	}
 
+	// Effect parameters: one 4x1 float texture per effect pass (see fx.hlsl).
+	std::vector<int> fx_index(list.size(), -1);
+	int fx_count = 0;
+	for (size_t pi = 0; pi < list.size(); pi++)
+		if (list[pi].op != RenderPass::Op::Draw) fx_index[pi] = fx_count++;
+	if (fx_count > 0) {
+		const size_t bytes = static_cast<size_t>(fx_count) * 64;
+		if (bytes > ptransfer_capacity_) {
+			if (ptransfer_) SDL_ReleaseGPUTransferBuffer(gpu_->device, ptransfer_);
+			ptransfer_capacity_ = bytes * 2;
+			SDL_GPUTransferBufferCreateInfo ti{SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, static_cast<Uint32>(ptransfer_capacity_), 0};
+			ptransfer_ = SDL_CreateGPUTransferBuffer(gpu_->device, &ti);
+		}
+		while (static_cast<int>(fx_params_.size()) < fx_count) {
+			SDL_GPUTextureCreateInfo ti{};
+			ti.type = SDL_GPU_TEXTURETYPE_2D;
+			ti.format = SDL_GPU_TEXTUREFORMAT_R32G32B32A32_FLOAT;
+			ti.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+			ti.width = 4;
+			ti.height = 1;
+			ti.layer_count_or_depth = 1;
+			ti.num_levels = 1;
+			fx_params_.push_back(SDL_CreateGPUTexture(gpu_->device, &ti));
+		}
+		float* map = static_cast<float*>(SDL_MapGPUTransferBuffer(gpu_->device, ptransfer_, true));
+		for (size_t pi = 0; pi < list.size(); pi++) {
+			if (fx_index[pi] < 0) continue;
+			float* dst = map + static_cast<size_t>(fx_index[pi]) * 16;
+			std::memset(dst, 0, 64);
+			std::memcpy(dst, list[pi].p, sizeof(list[pi].p));
+			if (list[pi].op == RenderPass::Op::Blur && dst[2] < 0.25f) dst[2] = 0.25f; // no blur below a quarter texel
+		}
+		SDL_UnmapGPUTransferBuffer(gpu_->device, ptransfer_);
+		SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
+		for (int k = 0; k < fx_count; k++) {
+			SDL_GPUTextureTransferInfo src{ptransfer_, static_cast<Uint32>(k * 64), 4, 1};
+			SDL_GPUTextureRegion dst{};
+			dst.texture = fx_params_[k];
+			dst.w = 4;
+			dst.h = 1;
+			dst.d = 1;
+			SDL_UploadToGPUTexture(cp, &src, &dst, k == 0);
+		}
+		SDL_EndGPUCopyPass(cp);
+	}
+
 	SpriteUniforms u{};
 	u.color_balance[0] = u.color_balance[1] = u.color_balance[2] = u.color_balance[3] = 1.f;
 	// clip space -> texture space, stored for HLSL's default column-major cbuffer matrices (mul(v, M) with a row vector)
@@ -323,6 +432,7 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 		ci.load_op = clear ? SDL_GPU_LOADOP_CLEAR : SDL_GPU_LOADOP_LOAD;
 		ci.store_op = SDL_GPU_STOREOP_STORE;
 		rp = SDL_BeginGPURenderPass(cmd, &ci, 1, nullptr);
+		if (!rp) std::fprintf(stderr, "[render] begin pass failed: %s\n", SDL_GetError());
 		SDL_PushGPUVertexUniformData(cmd, 0, &u, sizeof(u));
 		if (!verts_.empty()) {
 			SDL_GPUBufferBinding bind{vbuf_, 0};
@@ -344,10 +454,27 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 	for (size_t pi = 0; pi < list.size(); pi++) {
 		const RenderPass& ps = list[pi];
 		const std::vector<DrawItem>& items = ps.items;
-		const bool to_target = ps.target != nullptr;
-		SDL_GPUTexture* target = to_target ? ps.target->gpu : frame_;
+		const bool to_target = ps.target != nullptr || ps.temp_target >= 0;
+		SDL_GPUTexture* target = frame_;
+		if (ps.target) target = ps.target->gpu;
+		else if (ps.temp_target >= 0) target = temp_texture(ps.temp_target, ps.w, ps.h)->gpu;
 		Scratch& sc = scratch(ps.w, ps.h);
 		const size_t base = pass_base[pi];
+
+		if (ps.op != RenderPass::Op::Draw) { // post effect over a temporary texture
+			const bool blur = ps.op == RenderPass::Op::Blur;
+			begin_pass(target, true, 0.f);
+			if (SDL_GPUGraphicsPipeline* p = fx_pipeline(blur)) {
+				SDL_BindGPUGraphicsPipeline(rp, p);
+				SDL_GPUTextureSamplerBinding ts[2] = {{temp_texture(ps.in_temp, ps.w, ps.h)->gpu, sampler_linear_},
+													   {fx_params_[fx_index[pi]], sampler_point_}};
+				SDL_BindGPUFragmentSamplers(rp, 0, ts, 2);
+				SDL_DrawGPUPrimitives(rp, 6, 1, static_cast<Uint32>(base), 0);
+			}
+			end_pass();
+			continue;
+		}
+		auto item_tex = [&](const DrawItem& d) -> const Texture* { return d.temp >= 0 ? temp_texture(d.temp, ps.w, ps.h) : tex_of(d.texture); };
 		auto is_plain = [&](const DrawItem& d) {
 			return !d.has_mask && !d.trans_tex && !blend_reads_destination(d.blend) && d.snap == DrawItem::Snap::None;
 		};
@@ -359,9 +486,9 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			const bool reads_dest = blend_reads_destination(it.blend);
 			if (is_plain(it)) { // batch consecutive plain quads with the same state and texture
 				size_t j = i + 1;
-				const Texture* tex = tex_of(it.texture);
+				const Texture* tex = item_tex(it);
 				while (j < items.size() && is_plain(items[j]) && items[j].blend == it.blend && items[j].premult == it.premult &&
-					   tex_of(items[j].texture) == tex)
+					   item_tex(items[j]) == tex)
 					j++;
 				if (SDL_GPUGraphicsPipeline* p = pipeline(it.blend, ps_for(it.blend, false, false), 1, to_target, it.premult)) {
 					SDL_BindGPUGraphicsPipeline(rp, p);
@@ -399,7 +526,7 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			if (SDL_GPUGraphicsPipeline* p = pipeline(it.blend, name, n, to_target, it.premult)) {
 				SDL_GPUTextureSamplerBinding slots[8];
 				for (auto& s : slots) s = {white_.gpu, sampler_linear_};
-				slots[0].texture = snap_screen ? sc.dest : tex_of(it.texture)->gpu;
+				slots[0].texture = snap_screen ? sc.dest : item_tex(it)->gpu;
 				slots[2].texture = sc.mask;
 				if (trans) {
 					slots[3].texture = it.trans_tex->gpu;

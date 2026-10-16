@@ -323,6 +323,67 @@ SQInteger is_transitioning(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->trans.active)
 SQInteger get_transition_timer(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->trans.active ? spr(v)->trans.duration - spr(v)->trans.timer : 0.f); return 1; }
 SQInteger get_transition_file(HSQUIRRELVM v) { sq_pushstring(v, spr(v)->trans_file.c_str(), -1); return 1; }
 
+// Post effects: set(value, time_ms, tempo) / get / timer (remaining ms) of one animated value of Sprite::fx.
+using FxAnim = Anim<1> Sprite::Effects::*;
+template <FxAnim M> SQInteger fx_set(HSQUIRRELVM v) {
+	(spr(v)->fx.*M).start({arg_float(v, 2)}, arg_float(v, 3), static_cast<int>(arg_int(v, 4)));
+	return 0;
+}
+template <FxAnim M> SQInteger fx_get(HSQUIRRELVM v) { sq_pushfloat(v, (spr(v)->fx.*M).value[0]); return 1; }
+template <FxAnim M> SQInteger fx_timer(HSQUIRRELVM v) {
+	const Anim<1>& a = spr(v)->fx.*M;
+	sq_pushfloat(v, a.active ? a.duration - a.timer : 0.f);
+	return 1;
+}
+SQInteger set_monochrome(HSQUIRRELVM v) { // (power, cb, cr, time, tempo)
+	Sprite* s = spr(v);
+	s->fx.mono_cb = arg_float(v, 3);
+	s->fx.mono_cr = arg_float(v, 4);
+	s->fx.mono.start({arg_float(v, 2)}, arg_float(v, 5), static_cast<int>(arg_int(v, 6)));
+	return 0;
+}
+SQInteger get_mono_cb(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.mono_cb); return 1; }
+SQInteger get_mono_cr(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.mono_cr); return 1; }
+SQInteger set_shading_parameter(HSQUIRRELVM v) { // (level, density)
+	spr(v)->fx.shade_level = static_cast<int>(arg_int(v, 2));
+	spr(v)->fx.shade_density = arg_float(v, 3);
+	return 0;
+}
+SQInteger get_shading_level(HSQUIRRELVM v) { sq_pushinteger(v, spr(v)->fx.shade_level); return 1; }
+SQInteger get_shading_density(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.shade_density); return 1; }
+
+static void register_effect_methods(ScriptHost& h) {
+	h.add_method("setColorHue", fx_set<&Sprite::Effects::hue>);
+	h.add_method("getColorHue", fx_get<&Sprite::Effects::hue>);
+	h.add_method("getColorHueTimer", fx_timer<&Sprite::Effects::hue>);
+	h.add_method("setColorSaturation", fx_set<&Sprite::Effects::saturation>);
+	h.add_method("getColorSaturation", fx_get<&Sprite::Effects::saturation>);
+	h.add_method("getColorSaturationTimer", fx_timer<&Sprite::Effects::saturation>);
+	h.add_method("setColorBrightness", fx_set<&Sprite::Effects::brightness>);
+	h.add_method("getColorBrightness", fx_get<&Sprite::Effects::brightness>);
+	h.add_method("getColorBrightnessTimer", fx_timer<&Sprite::Effects::brightness>);
+	h.add_method("setColorGlow", fx_set<&Sprite::Effects::glow>);
+	h.add_method("getColorGlow", fx_get<&Sprite::Effects::glow>);
+	h.add_method("getColorGlowTimer", fx_timer<&Sprite::Effects::glow>);
+	h.add_method("setSepiaPower", fx_set<&Sprite::Effects::sepia>);
+	h.add_method("getSepiaPower", fx_get<&Sprite::Effects::sepia>);
+	h.add_method("getSepiaPowerTimer", fx_timer<&Sprite::Effects::sepia>);
+	h.add_method("setNegaposiPower", fx_set<&Sprite::Effects::nega>);
+	h.add_method("getNegaposiPower", fx_get<&Sprite::Effects::nega>);
+	h.add_method("getNegaposiPowerTimer", fx_timer<&Sprite::Effects::nega>);
+	h.add_method("setMonochromePower", set_monochrome);
+	h.add_method("getMonochromePower", fx_get<&Sprite::Effects::mono>);
+	h.add_method("getMonochromePowerTimer", fx_timer<&Sprite::Effects::mono>);
+	h.add_method("getMonochromeCb", get_mono_cb);
+	h.add_method("getMonochromeCr", get_mono_cr);
+	h.add_method("setShadingPower", fx_set<&Sprite::Effects::shade>);
+	h.add_method("getShadingPower", fx_get<&Sprite::Effects::shade>);
+	h.add_method("getShadingPowerTimer", fx_timer<&Sprite::Effects::shade>);
+	h.add_method("setShadingParameter", set_shading_parameter);
+	h.add_method("getShadingLevel", get_shading_level);
+	h.add_method("getShadingDensity", get_shading_density);
+}
+
 static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool render_target = false);
 void register_sprite_class(ScriptHost& h) {
 	h.begin_class("SQSprite");
@@ -358,6 +419,7 @@ static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool 
 		register_movie_methods(h);
 	}
 	h.add_method("setSurface", set_surface);
+	register_effect_methods(h);
 	register_sprite_property_methods(h);
 	h.add_method("setClickable", set_clickable);
 	h.add_method("isOver", is_over);

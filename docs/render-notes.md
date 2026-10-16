@@ -59,3 +59,13 @@ A sprite binds **wrap** when any of its UV offset/scroll fields (+0xf0, +0xf4, +
 the point/linear choice comes from a per-sprite flag at +0x200. The same sampler is bound to slots 0 and 1; textures are
 bound to slots 0 and 1 (`+0x1f4`, `+0x1fc`: main texture and a second one). The draw (slot 64, FUN_100234b0) binds those,
 then calls the generic primitive draw `FUN_100211a0(this, topology=2, ...)` and unbinds textures 0/1.
+
+## Sprite effects (own implementation, shaders/hlsl/fx.hlsl)
+- Any sprite with an active effect (`Sprite::fx`) is drawn alone into a temporary texture, run through blur (`shading`) and/or colour
+  passes, then composited with its blend mode and fade. `SetShadingPower` is implemented as a gaussian blur: sigma(px) =
+  power * (10 + 8 * level) with level LOW/MIDDLE/HIGH = 0/2/4 (a guess from the names of the sprites it is used on: haze, hazy photo,
+  dizziness; `density` is ignored). Hue/saturation/brightness/glow follow the reconstructed pshsv shader; sepia/nega/mono as well.
+- Not implemented: lens, raster, ripple, radial/directional blur, UV offset, colour balance/level, displacement maps.
+- D3D12 gotcha: a pixel shader must read every output of the vertex shader (color, uv, projective) or the pipeline cannot be created
+  (E_INVALIDARG): the dropped TEXCOORD2 shifts the packed input registers. fx.hlsl reads all of them with two always-true clip() calls.
+  Fragment uniform buffers were never tried; effect parameters go through a 4x1 float texture instead.

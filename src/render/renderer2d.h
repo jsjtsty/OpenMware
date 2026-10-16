@@ -52,6 +52,8 @@ private:
 	SDL_GPUGraphicsPipeline* pipeline(int blend, const std::string& ps_name, Uint32 samplers, bool to_target, bool premult);
 	Texture* make_rule_texture(float now, float rate);
 	Scratch& scratch(int w, int h);
+	Texture* temp_texture(int slot, int w, int h);
+	SDL_GPUGraphicsPipeline* fx_pipeline(bool blur);
 	void draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list);
 	void ensure_vertex_buffer(size_t bytes);
 
@@ -59,8 +61,14 @@ private:
 	const GameFiles* files_ = nullptr;
 	SDL_GPUShader* vs_ = nullptr;
 	SDL_GPUSampler* sampler_linear_ = nullptr;
+	SDL_GPUSampler* sampler_point_ = nullptr;
+	std::vector<SDL_GPUTexture*> fx_params_;           // per effect pass of a frame: 4x1 float texture of its parameters
+	SDL_GPUTransferBuffer* ptransfer_ = nullptr;
+	size_t ptransfer_capacity_ = 0;
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
 	std::map<std::pair<int, int>, Scratch> scratch_;
+	std::vector<Texture*> temps_;                      // temporary textures of the effect chains, by slot
+	SDL_GPUGraphicsPipeline* fx_pipes_[2] = {};        // [0] colour, [1] blur
 	Texture* rule_ = nullptr;         // transition rule ramp
 	SDL_GPUBuffer* vbuf_ = nullptr;
 	SDL_GPUTransferBuffer* vtransfer_ = nullptr;

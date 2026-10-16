@@ -122,7 +122,12 @@ int main(int argc, char** argv) {
 		stage.build_draw_list(items);
 		const bool last = frames >= 0 && frame == frames - 1;
 		if (last && !shot.empty()) {
-			if (trace) stage.dump();
+			if (trace) {
+				stage.dump();
+				for (const RenderPass& p : items)
+					std::printf("  pass op=%d target=%d temp=%d in=%d %dx%d items=%zu\n", static_cast<int>(p.op), p.target ? 1 : 0, p.temp_target, p.in_temp,
+								p.w, p.h, p.items.size());
+			}
 			renderer.save_frame_png(items, shot);
 			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.empty() ? size_t(0) : items.back().items.size(), stage.size());
 		} else if (shot.empty()) {
