@@ -10,6 +10,11 @@
       "host": false
     },
     "libwebp",
-    "stb"
+    "stb",
+    {
+      "name": "ffmpeg",
+      "default-features": false,
+      "features": ["avcodec", "avformat", "swresample", "swscale"]
+    }
   ]
 }

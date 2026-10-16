@@ -14,6 +14,10 @@ namespace omw {
 
 SpriteRef::~SpriteRef() {
 	if (!sprite) return;
+	if (aux) { // the movie state's tick hook points into it
+		sprite->tick = nullptr;
+		sprite->texture = nullptr;
+	}
 	sprite->released = true; // the script dropped its last reference: the sprite leaves the stage
 	if (ScriptHost::current() && ScriptHost::current()->verbose)
 		std::printf("[f%d] [sprite %s] released\n", ScriptHost::current()->frame, sprite->name.c_str());
@@ -224,6 +228,7 @@ void register_sprite_class(ScriptHost& h) {
 	h.add_method("createColor", create_color);
 	h.add_method("createScreen", create_screen);
 	register_sprite_property_methods(h);
+	register_movie_methods(h);
 	h.add_method("scroll", scroll);
 	h.add_method("getScroll", get_scroll);
 	h.add_method("getSize", get_size);

@@ -41,6 +41,12 @@ add_library(omw_audio STATIC src/audio/audio.cpp src/audio/vorbis_impl.cpp)
 target_include_directories(omw_audio PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(omw_audio PUBLIC omw_game SDL3::SDL3)
 
+find_package(FFMPEG REQUIRED)
+add_library(omw_video STATIC src/video/movie.cpp)
+target_include_directories(omw_video PUBLIC src PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(omw_video PUBLIC ${FFMPEG_LIBRARY_DIRS})
+target_link_libraries(omw_video PUBLIC omw_audio ${FFMPEG_LIBRARIES})
+
 add_library(omw_render STATIC src/render/gpu.cpp src/render/renderer2d.cpp src/render/image.cpp src/render/text_raster.cpp)
 target_include_directories(omw_render PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webp)
@@ -75,9 +81,9 @@ add_dependencies(gpu_demo omw_shaders)
 
 # --- Script runtime -----------------------------------------------------------------------------
 add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp
-	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp src/script/natives_text.cpp src/script/natives_sound.cpp)
+	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp src/script/natives_text.cpp src/script/natives_sound.cpp src/script/natives_movie.cpp)
 target_include_directories(omw_script PUBLIC src)
-target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render omw_audio squirrel2::squirrel2)
+target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render omw_audio omw_video squirrel2::squirrel2)
 
 add_executable(scriptrun apps/scriptrun.cpp)
 target_link_libraries(scriptrun PRIVATE omw_script)

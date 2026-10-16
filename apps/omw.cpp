@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
 	int frames = -1;
 	bool trace = false;
 	std::string shot;
+	std::vector<std::pair<int, std::string>> evals; // --eval FRAME:CODE (run a script snippet at a frame)
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
 		const std::string a = argv[i];
@@ -34,6 +35,10 @@ int main(int argc, char** argv) {
 		else if (a == "--frames" && i + 1 < argc) frames = std::atoi(argv[++i]);
 		else if (a == "--shot" && i + 1 < argc) shot = argv[++i];
 		else if (a == "--trace") trace = true;
+		else if (a == "--eval" && i + 1 < argc) {
+			const std::string spec = argv[++i];
+			evals.emplace_back(std::atoi(spec.c_str()), spec.substr(spec.find(':') + 1));
+		}
 		else if (a == "--press" && i + 1 < argc) {
 			int f = 0, k = 0;
 			if (std::sscanf(argv[++i], "%d:%d", &f, &k) == 2) taps.emplace_back(f, k);
@@ -80,6 +85,8 @@ int main(int argc, char** argv) {
 	for (int frame = 0; running && (frames < 0 || frame < frames); frame++) {
 		for (const auto& [f, k] : taps)
 			if (f == frame) input.tap_key(k);
+		for (const auto& [f, code] : evals)
+			if (f == frame) host.debug_eval(code.c_str());
 		input.poll(gpu.window, Stage::kWidth, Stage::kHeight, 1000.f / 60.f);
 		if (input.quit) running = false;
 		if (!host.resume_frame(&err)) {
