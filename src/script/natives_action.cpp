@@ -1,15 +1,10 @@
 // SQAction1D: a timed 1-D value animation (src -> dst over a duration with a selectable tempo curve).
 // Layout and update rules follow the original (fields: duration, timer, src, dst, value, power, tempo, active, time scale).
+#include "game/anim.h"
 #include "script/bind.h"
 #include "script/host.h"
 
 namespace omw {
-
-// Tempo curves; replaced by the exact port of the original table (docs/codex-tasks/06) when available.
-float (*g_tempo_eval)(int tempo, float src, float dst, float duration, float timer) =
-	[](int, float src, float dst, float duration, float timer) -> float {
-	return duration > 0.f ? src + (dst - src) * (timer / duration) : dst;
-};
 
 namespace {
 

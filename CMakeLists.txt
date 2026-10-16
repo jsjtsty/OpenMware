@@ -26,12 +26,39 @@ target_link_libraries(npktool PRIVATE omw_archive)
 find_package(SDL3 CONFIG REQUIRED)
 include(cmake/OmwShaders.cmake)
 
-add_library(omw_render STATIC src/render/gpu.cpp)
-target_include_directories(omw_render PUBLIC src)
-target_link_libraries(omw_render PUBLIC SDL3::SDL3)
+find_package(WebP CONFIG REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb_image.h" REQUIRED)
 
-omw_add_shader(NAME vssprite.vert STAGE vertex SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/sprite_vs.hlsl DEFINES VERTEX_SPRITE)
-omw_add_shader(NAME pssprite_blend_normal.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/sprite.hlsl DEFINES BLEND_MODE_BLEND)
+add_library(omw_game STATIC src/game/anim.cpp src/game/stage.cpp src/game/game_files.cpp)
+target_include_directories(omw_game PUBLIC src)
+target_link_libraries(omw_game PUBLIC omw_archive SDL3::SDL3)
+
+add_library(omw_render STATIC src/render/gpu.cpp src/render/renderer2d.cpp src/render/image.cpp)
+target_include_directories(omw_render PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
+target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webp)
+
+# Every 2D shader of the manifest (the 3D scene shaders are not used by the game scripts).
+file(STRINGS ${PROJECT_SOURCE_DIR}/shaders/hlsl/manifest.tsv _omw_shader_rows)
+list(POP_FRONT _omw_shader_rows) # header
+foreach(_row IN LISTS _omw_shader_rows)
+	if(_row MATCHES "^([^	]+)	([^	]+)	(.*)$")
+		set(_name "${CMAKE_MATCH_1}")
+		set(_file "${CMAKE_MATCH_2}")
+		set(_defs "${CMAKE_MATCH_3}")
+		if(_name MATCHES "^scene/" OR _file MATCHES "^scene/" OR _name MATCHES "^gs")
+			continue()
+		endif()
+		string(REGEX REPLACE "^.*/" "" _base "${_name}")
+		if(_base MATCHES "^vs")
+			set(_stage vertex)
+			set(_ext vert)
+		else()
+			set(_stage fragment)
+			set(_ext frag)
+		endif()
+		omw_add_shader(NAME ${_base}.${_ext} STAGE ${_stage} SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/${_file} DEFINES ${_defs})
+	endif()
+endforeach()
 add_custom_target(omw_shaders DEPENDS ${_omw_all_shader_outputs})
 
 add_executable(gpu_demo apps/gpu_demo.cpp)
@@ -39,9 +66,10 @@ target_link_libraries(gpu_demo PRIVATE omw_render)
 add_dependencies(gpu_demo omw_shaders)
 
 # --- Script runtime -----------------------------------------------------------------------------
-add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp src/script/natives_globals.cpp src/script/natives_app.cpp)
+add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp
+	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp)
 target_include_directories(omw_script PUBLIC src)
-target_link_libraries(omw_script PUBLIC omw_archive squirrel2::squirrel2)
+target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render squirrel2::squirrel2)
 
 add_executable(scriptrun apps/scriptrun.cpp)
 target_link_libraries(scriptrun PRIVATE omw_script)
@@ -50,3 +78,8 @@ target_link_libraries(scriptrun PRIVATE omw_script)
 add_executable(nutdis tools/nutdis.cpp)
 target_include_directories(nutdis PRIVATE third_party/squirrel2/squirrel)
 target_link_libraries(nutdis PRIVATE squirrel2::squirrel2)
+
+# --- The game ------------------------------------------------------------------------------------
+add_executable(omw apps/omw.cpp)
+target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
+add_dependencies(omw omw_shaders)

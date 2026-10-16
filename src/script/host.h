@@ -22,10 +22,16 @@ struct AppState {
 	float frame_speed = 1.0f;
 };
 
+class Stage;
+class Renderer2D;
+
 class ScriptHost {
 public:
 	static ScriptHost* current();
 	AppState app;
+	int frame = 0; // frames resumed so far
+	Stage* stage = nullptr;       // set by the game; null when running headless (scriptrun)
+	Renderer2D* renderer = nullptr;
 
 	explicit ScriptHost(NpkArchive& scripts);
 	~ScriptHost();

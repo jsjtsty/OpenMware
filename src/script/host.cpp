@@ -108,7 +108,7 @@ SQInteger native_stub(HSQUIRRELVM v) {
 	ScriptHost* h = host_of(v);
 	const int count = ++h->stub_calls[name];
 	if (h->verbose) {
-		std::string line = std::string("[stub] ") + name + "(";
+		std::string line = "[f" + std::to_string(h->frame) + "] [stub] " + name + "(";
 		const SQInteger argc = sq_gettop(v) - 2;
 		for (SQInteger i = 0; i < argc; i++) line += (i ? ", " : "") + describe_arg(v, 2 + i);
 		line += ")";
@@ -252,6 +252,7 @@ bool ScriptHost::resume_frame(std::string* error) {
 		if (error) *error = "main script is not suspended";
 		return false;
 	}
+	frame++;
 	if (SQ_FAILED(sq_wakeupvm(vm_, SQFalse, SQFalse, SQTrue, SQFalse))) {
 		if (error) *error = "error while running a frame";
 		return false;
