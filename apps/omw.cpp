@@ -1,11 +1,14 @@
 // omw: runs the game. Usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]
 //   --frames N  stop after N frames;  --shot FILE  with --frames: save the last frame as PNG (offscreen, no presentation)
+#include "audio/audio.h"
 #include "game/game_files.h"
 #include "game/input.h"
 #include "game/stage.h"
 #include "render/gpu.h"
 #include "render/renderer2d.h"
 #include "script/host.h"
+
+#include <SDL3/SDL.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,6 +17,7 @@
 using namespace omw;
 
 int main(int argc, char** argv) {
+	std::setvbuf(stdout, nullptr, _IONBF, 0); // keep diagnostics visible if the process crashes
 	if (argc < 2) {
 		std::fputs("usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]\n", stderr);
 		return 2;
@@ -54,10 +58,13 @@ int main(int argc, char** argv) {
 	}
 
 	renderer.fonts().set_files(&files);
+	AudioEngine audio;
+	if (!std::getenv("OMW_NOAUDIO") && !audio.init()) std::fprintf(stderr, "no audio device (%s); sound runs silently\n", SDL_GetError());
 	Stage stage;
 	ScriptHost host(*files.archive("script"));
 	host.stage = &stage;
 	host.renderer = &renderer;
+	host.audio = &audio;
 	host.files = &files;
 	host.enable_discovery();
 	host.verbose = trace;
@@ -80,6 +87,7 @@ int main(int argc, char** argv) {
 			break;
 		}
 		stage.update(1000.f / 60.f);
+		audio.update(1000.f / 60.f);
 		items.clear();
 		stage.build_draw_list(items);
 		const bool last = frames >= 0 && frame == frames - 1;
@@ -94,10 +102,13 @@ int main(int argc, char** argv) {
 	}
 
 	if (const char* code = std::getenv("OMW_EVAL_END")) host.debug_eval(code);
+	if (trace) std::printf("audio peak %.3f\n", audio.peak());
 	std::printf("stubs called:\n");
 	for (const auto& [name, n] : host.stub_calls) std::printf("  %5d  %s\n", n, name.c_str());
 	host.renderer = nullptr; // script objects are released later; they must not touch the renderer any more
 	renderer.shutdown();
+	host.audio = nullptr;
+	audio.shutdown();
 	gpu.shutdown();
 	return 0;
 }

@@ -1,5 +1,6 @@
 // SQApp: the application object (window, config, input, resources). Platform-facing parts keep their state in
 // ScriptHost::app; everything that needs a real window/audio device is a harmless default until the platform layer exists.
+#include "audio/audio.h"
 #include "game/input.h"
 #include "render/renderer2d.h"
 #include "script/bind.h"
@@ -124,6 +125,11 @@ void register_app_class(ScriptHost& h) {
 	h.add_method("showMessageBox", ret_zero);
 	h.add_method("setCloseCallback", ret_null);
 	// resources: the renderer/audio layers will take these over; accepting the request is enough for now
+	h.add_method("setSoundTypeVolume", [](HSQUIRRELVM v) -> SQInteger { // (type, power, time_ms, tempo)
+		if (ScriptHost::current()->verbose) std::printf("[sound] type %d volume %.2f over %.0fms\n", static_cast<int>(sqb::arg_int(v, 2)), sqb::arg_float(v, 3), sqb::arg_float(v, 4));
+		if (ScriptHost::current()->audio) ScriptHost::current()->audio->set_type_volume(static_cast<int>(sqb::arg_int(v, 2)), sqb::arg_float(v, 3), sqb::arg_float(v, 4), static_cast<int>(sqb::arg_int(v, 5)));
+		return 0;
+	});
 	h.add_method("isKeyDown", is_key_down);
 	h.add_method("getKeyState", get_key_state);
 	h.add_method("getMouseButtonStateL", [](HSQUIRRELVM v) -> SQInteger { sq_pushinteger(v, input() ? input()->mouse_state(0) : 0); return 1; });
@@ -139,7 +145,7 @@ void register_app_class(ScriptHost& h) {
 	});
 	for (const char* n : {"loadTexture", "loadFont", "loadParticle", "mountFile", "loadSystemConfig"}) h.add_method(n, ret_true);
 	for (const char* n : {"unloadTexture", "unloadFont", "unloadParticle", "unmountFile", "clearFontCache", "setParticleDebugDrawEnable",
-						  "injectSoundFile", "ejectSoundFile", "defineSoundGroup", "setSoundGroupVolume", "setSoundTypeVolume",
+						  "injectSoundFile", "ejectSoundFile", "defineSoundGroup", "setSoundGroupVolume",
 						  "createPhysicsWorld", "deletePhysicsWorld", "saveSystemConfig", "applyPresetConfig", "applySystemConfig",
 						  "setCursor", "showCursor", "setCursorPosition", "clearMouseInput", "clearTouchInput", "setGamepadVibration",
 						  "fadeoutScreen", "fadeoutColor", "callTask", "bindModule", "loadModule"})
