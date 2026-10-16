@@ -1,5 +1,9 @@
 #include "script/host.h"
 
+#include <sqstdmath.h>
+#include <sqstdstring.h>
+#include <sqstdsystem.h>
+
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -81,8 +85,15 @@ SQInteger native_import(HSQUIRRELVM v) {
 	const SQChar* path = nullptr;
 	sq_getstring(v, 2, &path);
 	std::string err;
-	if (!host_of(v)->import(path ? path : "", &err)) return sq_throwerror(v, err.c_str());
-	return 0;
+	if (!host_of(v)->import(path ? path : "", &err)) {
+		if (err.rfind("script not found", 0) == 0) { // the original returns -1 for a missing file
+			sq_pushinteger(v, -1);
+			return 1;
+		}
+		return sq_throwerror(v, err.c_str());
+	}
+	sq_pushinteger(v, 0);
+	return 1;
 }
 
 std::string describe_arg(HSQUIRRELVM v, SQInteger idx) {
@@ -211,6 +222,7 @@ ScriptHost::~ScriptHost() {
 
 bool ScriptHost::load(const std::string& path, std::string* error) {
 	const NpkEntry* e = scripts_.find_ci(path);
+	if (!e) e = scripts_.find_ci("media/script/" + path); // short names such as lang/ch/x.nut are relative to the script root
 	if (!e) {
 		if (error) *error = "script not found: " + path;
 		return false;
@@ -234,7 +246,7 @@ bool ScriptHost::import(const std::string& path, std::string* error) {
 	std::string key = path;
 	for (char& c : key)
 		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-	if (!loaded_.insert(key).second) return true;
+	loaded_.insert(key); // the original always re-runs the file (scripts rely on this to redefine ::main)
 	if (verbose) std::fprintf(stderr, "[import] %s\n", path.c_str());
 	if (!load(path, error)) return false;
 	sq_pushroottable(vm_);
@@ -309,6 +321,11 @@ void ScriptHost::register_natives() {
 		sq_newslot(vm_, -3, SQFalse);
 		sq_pop(vm_, 1);
 	};
+	sq_pushroottable(vm_);
+	sqstd_register_mathlib(vm_);
+	sqstd_register_stringlib(vm_);
+	sqstd_register_systemlib(vm_);
+	sq_pop(vm_, 1);
 	reg("Import", native_import);
 	reg("IncludeFile", native_import);
 }

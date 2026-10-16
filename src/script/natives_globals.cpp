@@ -75,6 +75,7 @@ void register_global_natives(ScriptHost& h) {
 	h.add_global("SetSavePathRoot", set_save_root);
 	h.add_global("GetTempPathRoot", get_temp_root);
 	h.add_global("SystemCall", system_call);
+	h.add_global("SetClearTrue", [](HSQUIRRELVM) -> SQInteger { return 0; }); // platform achievement hook (Steam); nothing to do here
 	h.add_global("FileDelete", file_delete);
 	h.add_global("FileCopy", file_copy);
 	h.add_global("FileMove", file_move);
