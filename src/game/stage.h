@@ -5,6 +5,7 @@
 #include "render/blend.h"
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,7 +20,8 @@ struct Sprite {
 	std::string name;
 	Kind kind = Kind::None;
 	int priority = 0;
-	bool erase = false;
+	bool erase = false;    // script-visible flag (SetErase); does not remove the sprite by itself
+	bool released = false; // the script dropped its last reference: the sprite leaves the stage
 	float time_scale = 1.f;
 	int blend = BLEND_NORMAL;
 	uint64_t order = 0; // creation order, tie-break for equal priorities
@@ -38,6 +40,8 @@ struct Sprite {
 	std::array<Anim<3>, 4> color; // per-corner RGB (0..255)
 	Anim<2> scroll{0.f};
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
+
+	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)
 
 	Sprite();
 	void update(float dt_ms);
@@ -63,6 +67,7 @@ public:
 	// Visible sprites back-to-front as quads.
 	void build_draw_list(std::vector<DrawItem>& out) const;
 	size_t size() const { return sprites_.size(); }
+	void dump() const; // one line per sprite on stdout (debugging)
 
 private:
 	std::vector<std::shared_ptr<Sprite>> sprites_;

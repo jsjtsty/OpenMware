@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace omw {
 
@@ -13,6 +14,7 @@ Sprite::Sprite() {
 
 void Sprite::update(float dt_ms) {
 	const float dt = dt_ms * time_scale;
+	if (tick) tick(dt);
 	move.update(dt);
 	scale.update(dt);
 	rotate.update(dt);
@@ -35,8 +37,8 @@ void Stage::remove(const Sprite* s) {
 
 void Stage::update(float dt_ms) {
 	for (auto& s : sprites_) s->update(dt_ms);
-	// Erased sprites disappear from the stage.
-	sprites_.erase(std::remove_if(sprites_.begin(), sprites_.end(), [](const auto& p) { return p->erase; }), sprites_.end());
+	// Sprites the script no longer holds disappear from the stage.
+	sprites_.erase(std::remove_if(sprites_.begin(), sprites_.end(), [](const auto& p) { return p->released; }), sprites_.end());
 }
 
 void Stage::build_draw_list(std::vector<DrawItem>& out) const {
@@ -83,6 +85,13 @@ void Stage::build_draw_list(std::vector<DrawItem>& out) const {
 		d.u[3] = u0; d.v[3] = v1;
 		out.push_back(d);
 	}
+}
+
+void Stage::dump() const {
+	for (const auto& s : sprites_)
+		std::printf("  sprite %-28s kind=%d prio=%d fade=%.2f pos=(%.0f,%.0f) size=%.0fx%.0f scale=(%.2f,%.2f) tex=%d erase=%d\n", s->name.c_str(),
+					static_cast<int>(s->kind), s->priority, s->fade.value[0], s->move.value[0], s->move.value[1], s->width, s->height,
+					s->scale.value[0], s->scale.value[1], s->texture ? 1 : 0, s->erase ? 1 : 0);
 }
 
 } // namespace omw

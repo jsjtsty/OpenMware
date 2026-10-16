@@ -5,11 +5,20 @@
 #include "render/renderer2d.h"
 #include "script/bind.h"
 #include "script/host.h"
+#include "script/sprite_ref.h"
 
 #include <cmath>
 #include <cstdio>
 
 namespace omw {
+
+SpriteRef::~SpriteRef() {
+	if (!sprite) return;
+	sprite->released = true; // the script dropped its last reference: the sprite leaves the stage
+	if (ScriptHost::current() && ScriptHost::current()->verbose)
+		std::printf("[f%d] [sprite %s] released\n", ScriptHost::current()->frame, sprite->name.c_str());
+}
+
 namespace {
 
 using sqb::arg_float;
@@ -17,13 +26,6 @@ using sqb::arg_int;
 using sqb::arg_string;
 
 constexpr float kDeg2Rad = 3.14159265358979f / 180.f;
-
-struct SpriteRef {
-	std::shared_ptr<Sprite> sprite;
-	~SpriteRef() {
-		if (sprite) sprite->erase = true; // the script dropped its last reference: the sprite leaves the stage
-	}
-};
 
 ScriptHost& host() { return *ScriptHost::current(); }
 
@@ -78,7 +80,8 @@ SQInteger create_color(HSQUIRRELVM v) { // (w, h, r, g, b)
 	s->width = arg_float(v, 2);
 	s->height = arg_float(v, 3);
 	for (auto& c : s->color) c.set({arg_float(v, 4), arg_float(v, 5), arg_float(v, 6)});
-	return 0;
+	sq_pushinteger(v, 0); // 0 = success
+	return 1;
 }
 
 SQInteger create_screen(HSQUIRRELVM v) { // (x, y, w, h): capture of the screen; not drawn yet (TODO)
@@ -86,12 +89,17 @@ SQInteger create_screen(HSQUIRRELVM v) { // (x, y, w, h): capture of the screen;
 	s->kind = Sprite::Kind::Screen;
 	s->width = arg_float(v, 4, -1) > 0 ? arg_float(v, 4) : static_cast<float>(Stage::kWidth);
 	s->height = arg_float(v, 5, -1) > 0 ? arg_float(v, 5) : static_cast<float>(Stage::kHeight);
-	return 0;
+	sq_pushinteger(v, 0);
+	return 1;
 }
 
 SQInteger set_priority(HSQUIRRELVM v) { spr(v)->priority = static_cast<int>(arg_int(v, 2)); return 0; }
 SQInteger get_priority(HSQUIRRELVM v) { sq_pushinteger(v, spr(v)->priority); return 1; }
-SQInteger set_erase(HSQUIRRELVM v) { spr(v)->erase = arg_int(v, 2) != 0; return 0; }
+SQInteger set_erase(HSQUIRRELVM v) {
+	TRACE_SPRITE("[f%d] [sprite %s] setErase %d\n", host().frame, spr(v)->name.c_str(), static_cast<int>(arg_int(v, 2)));
+	spr(v)->erase = arg_int(v, 2) != 0;
+	return 0;
+}
 SQInteger get_erase(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->erase); return 1; }
 SQInteger set_blend_mode(HSQUIRRELVM v) { spr(v)->blend = static_cast<int>(arg_int(v, 2)); return 0; }
 SQInteger set_time_scale(HSQUIRRELVM v) { spr(v)->time_scale = arg_float(v, 2, 1.f); return 0; }
@@ -185,13 +193,7 @@ SQInteger is_rotating(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->rotate.active); re
 
 } // namespace
 
-void register_sprite_class(ScriptHost& h) {
-	h.begin_class("SQSprite");
-	h.add_method("constructor", ctor);
-	h.add_method("create", create);
-	h.add_method("createSubresource", create);
-	h.add_method("createColor", create_color);
-	h.add_method("createScreen", create_screen);
+void register_sprite_property_methods(ScriptHost& h) {
 	h.add_method("setPriority", set_priority);
 	h.add_method("getPriority", get_priority);
 	h.add_method("setErase", set_erase);
@@ -207,17 +209,27 @@ void register_sprite_class(ScriptHost& h) {
 	h.add_method("getScale", get_scale);
 	h.add_method("rotate", rotate);
 	h.add_method("getRotate", get_rotate);
-	h.add_method("scroll", scroll);
-	h.add_method("getScroll", get_scroll);
 	h.add_method("setPivot", set_pivot);
-	h.add_method("getSize", get_size);
-	h.add_method("setColor", set_color);
-	h.add_method("getColor", get_color);
-	h.add_method("isDeletedTexture", is_deleted_texture);
 	h.add_method("isMoving", is_moving);
 	h.add_method("isFading", is_fading);
 	h.add_method("isScaling", is_scaling);
 	h.add_method("isRotating", is_rotating);
+}
+
+void register_sprite_class(ScriptHost& h) {
+	h.begin_class("SQSprite");
+	h.add_method("constructor", ctor);
+	h.add_method("create", create);
+	h.add_method("createSubresource", create);
+	h.add_method("createColor", create_color);
+	h.add_method("createScreen", create_screen);
+	register_sprite_property_methods(h);
+	h.add_method("scroll", scroll);
+	h.add_method("getScroll", get_scroll);
+	h.add_method("getSize", get_size);
+	h.add_method("setColor", set_color);
+	h.add_method("getColor", get_color);
+	h.add_method("isDeletedTexture", is_deleted_texture);
 	h.end_class();
 }
 

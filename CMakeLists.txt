@@ -11,6 +11,10 @@ find_package(zstd CONFIG REQUIRED)
 # Squirrel 2.2.4 fork (32/64-bit bytecode ABI selectable at runtime via sq_open_ex).
 add_subdirectory(third_party/squirrel2 EXCLUDE_FROM_ALL)
 
+if(MSVC)
+	add_compile_options(/utf-8)
+endif()
+
 add_library(omw_archive STATIC
 	src/archive/aes256.cpp
 	src/archive/npk.cpp
@@ -29,11 +33,11 @@ include(cmake/OmwShaders.cmake)
 find_package(WebP CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_image.h" REQUIRED)
 
-add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/stage.cpp src/game/game_files.cpp)
+add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/text_markup.cpp src/game/stage.cpp src/game/game_files.cpp)
 target_include_directories(omw_game PUBLIC src)
 target_link_libraries(omw_game PUBLIC omw_archive SDL3::SDL3)
 
-add_library(omw_render STATIC src/render/gpu.cpp src/render/renderer2d.cpp src/render/image.cpp)
+add_library(omw_render STATIC src/render/gpu.cpp src/render/renderer2d.cpp src/render/image.cpp src/render/text_raster.cpp)
 target_include_directories(omw_render PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webp)
 
@@ -67,7 +71,7 @@ add_dependencies(gpu_demo omw_shaders)
 
 # --- Script runtime -----------------------------------------------------------------------------
 add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp
-	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp)
+	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp src/script/natives_text.cpp)
 target_include_directories(omw_script PUBLIC src)
 target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render squirrel2::squirrel2)
 

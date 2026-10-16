@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	renderer.fonts().set_files(&files);
 	Stage stage;
 	ScriptHost host(*files.archive("script"));
 	host.stage = &stage;
@@ -74,6 +75,7 @@ int main(int argc, char** argv) {
 		stage.build_draw_list(items);
 		const bool last = frames >= 0 && frame == frames - 1;
 		if (last && !shot.empty()) {
+			if (trace) stage.dump();
 			renderer.save_frame_png(items, shot);
 			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.size(), stage.size());
 		} else if (shot.empty()) {
@@ -84,6 +86,7 @@ int main(int argc, char** argv) {
 
 	std::printf("stubs called:\n");
 	for (const auto& [name, n] : host.stub_calls) std::printf("  %5d  %s\n", n, name.c_str());
+	host.renderer = nullptr; // script objects are released later; they must not touch the renderer any more
 	renderer.shutdown();
 	gpu.shutdown();
 	return 0;

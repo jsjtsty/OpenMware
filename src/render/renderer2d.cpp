@@ -65,6 +65,8 @@ void Renderer2D::shutdown() {
 	for (auto& [k, p] : pipelines_) if (p) SDL_ReleaseGPUGraphicsPipeline(gpu_->device, p);
 	for (auto& [k, s] : shaders_) if (s) SDL_ReleaseGPUShader(gpu_->device, s);
 	for (auto& [k, t] : textures_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+	for (auto& t : dynamic_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+	dynamic_.clear();
 	if (white_.gpu) SDL_ReleaseGPUTexture(gpu_->device, white_.gpu);
 	if (vbuf_) SDL_ReleaseGPUBuffer(gpu_->device, vbuf_);
 	if (vtransfer_) SDL_ReleaseGPUTransferBuffer(gpu_->device, vtransfer_);
@@ -74,6 +76,31 @@ void Renderer2D::shutdown() {
 	pipelines_.clear();
 	shaders_.clear();
 	textures_.clear();
+}
+
+Texture* Renderer2D::create_dynamic_texture(int w, int h, const uint8_t* rgba) {
+	auto t = std::make_unique<Texture>();
+	t->gpu = gpu_->create_texture_rgba8(w, h, rgba);
+	t->w = w;
+	t->h = h;
+	dynamic_.push_back(std::move(t));
+	return dynamic_.back().get();
+}
+
+void Renderer2D::replace_dynamic_texture(Texture* t, int w, int h, const uint8_t* rgba) {
+	if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+	t->gpu = gpu_->create_texture_rgba8(w, h, rgba);
+	t->w = w;
+	t->h = h;
+}
+
+void Renderer2D::destroy_dynamic_texture(Texture* t) {
+	for (auto it = dynamic_.begin(); it != dynamic_.end(); ++it) {
+		if (it->get() != t) continue;
+		if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+		dynamic_.erase(it);
+		return;
+	}
 }
 
 Texture* Renderer2D::texture(const std::string& path) {

@@ -6,6 +6,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 
@@ -175,6 +176,20 @@ SQInteger runtime_error_cb(HSQUIRRELVM v) {
 	SQStackInfos si;
 	for (SQInteger lvl = 1; SQ_SUCCEEDED(sq_stackinfos(v, lvl, &si)); lvl++)
 		std::fprintf(stderr, "  at %s (%s:%d)\n", si.funcname ? si.funcname : "?", si.source ? si.source : "?", static_cast<int>(si.line));
+	if (const char* code = std::getenv("OMW_EVAL")) { // debugging aid: run a snippet in the root table when a script fails
+		if (SQ_SUCCEEDED(sq_compilebuffer(v, code, static_cast<SQInteger>(std::strlen(code)), "OMW_EVAL", SQTrue))) {
+			sq_pushroottable(v);
+			sq_call(v, 1, SQFalse, SQFalse);
+			sq_pop(v, 1);
+		}
+	}
+	if (std::getenv("OMW_LOCALS")) { // locals of the failing function: what the failing expression was working with
+		SQUnsignedInteger idx = 0;
+		while (const SQChar* name = sq_getlocal(v, 1, idx++)) {
+			std::fprintf(stderr, "    local %s = %s\n", name, describe_arg(v, -1).c_str());
+			sq_pop(v, 1);
+		}
+	}
 	return 0;
 }
 
@@ -195,7 +210,7 @@ ScriptHost::ScriptHost(NpkArchive& scripts) : scripts_(scripts) {
 	register_natives();
 	register_global_natives(*this);
 	register_real_classes(*this);
-	for (const char* name : {"PreCompile", "Suspend", "CountTextLength", "TokenizeText", "ConvertToUTF16", "CompareSqObject",
+	for (const char* name : {"PreCompile", "Suspend", "TokenizeText", "ConvertToUTF16", "CompareSqObject",
 							 "CreateReferenceTable", "ClearReferenceTable", "SerializeRootTable", "DeserializeRootTable",
 							 "ResetNGCode", "AddNGCode_HeadOfLine", "AddNGCode_EndOfLine"}) {
 		sq_pushroottable(vm_);

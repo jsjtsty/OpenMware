@@ -1,8 +1,10 @@
 // Global native functions of the script runtime (the ones InitializeSquirrelRuntime registers in the original exe).
+#include "game/text_markup.h"
 #include "script/bind.h"
 #include "script/host.h"
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <random>
@@ -45,6 +47,22 @@ SQInteger system_call(HSQUIRRELVM v) { // (command) -> 0 on success; no external
 	return 1;
 }
 
+SQInteger count_text_length(HSQUIRRELVM v) { // (text) -> {text = visible characters, ruby = furigana characters}
+	size_t text = 0, ruby = 0;
+	for (const TextRun& r : parse_text_markup(sqb::arg_string(v, 2))) {
+		text += utf16_length(strip_controls(r.text));
+		ruby += utf16_length(r.ruby);
+	}
+	sq_newtable(v);
+	sq_pushstring(v, "text", -1);
+	sq_pushinteger(v, static_cast<SQInteger>(text));
+	sq_newslot(v, -3, SQFalse);
+	sq_pushstring(v, "ruby", -1);
+	sq_pushinteger(v, static_cast<SQInteger>(ruby));
+	sq_newslot(v, -3, SQFalse);
+	return 1;
+}
+
 SQInteger file_delete(HSQUIRRELVM v) {
 	std::error_code ec;
 	sq_pushinteger(v, std::filesystem::remove(std::filesystem::u8path(sqb::arg_string(v, 2)), ec) ? 0 : -1);
@@ -75,6 +93,8 @@ void register_global_natives(ScriptHost& h) {
 	h.add_global("SetSavePathRoot", set_save_root);
 	h.add_global("GetTempPathRoot", get_temp_root);
 	h.add_global("SystemCall", system_call);
+	h.add_global("OMW_Log", [](HSQUIRRELVM v) -> SQInteger { std::fprintf(stderr, "%s", sqb::arg_string(v, 2).c_str()); return 0; }); // debugging aid for OMW_EVAL
+	h.add_global("CountTextLength", count_text_length);
 	h.add_global("SetClearTrue", [](HSQUIRRELVM) -> SQInteger { return 0; }); // platform achievement hook (Steam); nothing to do here
 	h.add_global("FileDelete", file_delete);
 	h.add_global("FileCopy", file_copy);

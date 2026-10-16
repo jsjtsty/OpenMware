@@ -5,6 +5,7 @@
 #include "game/stage.h"
 #include "game/texture.h"
 #include "render/gpu.h"
+#include "render/text_raster.h"
 
 #include <map>
 #include <memory>
@@ -22,6 +23,12 @@ public:
 	// Cached texture from an archive path (webp/png/jpg); nullptr when it cannot be loaded.
 	Texture* texture(const std::string& path);
 	Texture* white() { return &white_; }
+
+	// Textures generated at run time (text bitmaps). The renderer owns them; `replace` swaps the pixels and size in place.
+	Texture* create_dynamic_texture(int w, int h, const uint8_t* rgba);
+	void replace_dynamic_texture(Texture* t, int w, int h, const uint8_t* rgba);
+	void destroy_dynamic_texture(Texture* t);
+	FontLibrary& fonts() { return fonts_; }
 
 	// Renders the draw list and presents. Returns false when the window is minimised (no frame was produced).
 	bool render_frame(const std::vector<DrawItem>& items);
@@ -47,6 +54,8 @@ private:
 	SDL_GPUTransferBuffer* vtransfer_ = nullptr;
 	size_t vcapacity_ = 0;
 	Texture white_;
+	std::vector<std::unique_ptr<Texture>> dynamic_;
+	FontLibrary fonts_;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
 	std::map<std::pair<int, std::string>, SDL_GPUGraphicsPipeline*> pipelines_;
 	std::map<std::string, SDL_GPUShader*> shaders_;

@@ -1,5 +1,6 @@
 // SQApp: the application object (window, config, input, resources). Platform-facing parts keep their state in
 // ScriptHost::app; everything that needs a real window/audio device is a harmless default until the platform layer exists.
+#include "render/renderer2d.h"
 #include "script/bind.h"
 #include "script/host.h"
 
@@ -107,7 +108,13 @@ void register_app_class(ScriptHost& h) {
 	h.add_method("showMessageBox", ret_zero);
 	h.add_method("setCloseCallback", ret_null);
 	// resources: the renderer/audio layers will take these over; accepting the request is enough for now
-	for (const char* n : {"loadTexture", "loadFont", "loadSystemFont", "loadParticle", "mountFile", "loadSystemConfig"}) h.add_method(n, ret_true);
+	h.add_method("loadSystemFont", [](HSQUIRRELVM v) -> SQInteger { // (name, family, size, weight, code_page, ...)
+		if (ScriptHost::current()->renderer)
+			ScriptHost::current()->renderer->fonts().register_font(sqb::arg_string(v, 2), sqb::arg_string(v, 3), sqb::arg_float(v, 4, 21.f));
+		sq_pushbool(v, SQTrue);
+		return 1;
+	});
+	for (const char* n : {"loadTexture", "loadFont", "loadParticle", "mountFile", "loadSystemConfig"}) h.add_method(n, ret_true);
 	for (const char* n : {"unloadTexture", "unloadFont", "unloadParticle", "unmountFile", "clearFontCache", "setParticleDebugDrawEnable",
 						  "injectSoundFile", "ejectSoundFile", "defineSoundGroup", "setSoundGroupVolume", "setSoundTypeVolume",
 						  "createPhysicsWorld", "deletePhysicsWorld", "saveSystemConfig", "applyPresetConfig", "applySystemConfig",
