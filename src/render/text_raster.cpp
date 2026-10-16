@@ -70,6 +70,14 @@ float advance_of(const FontEntry& f, uint32_t cp) {
 	return adv * scale;
 }
 
+float descent_of(const FontEntry& f) { // distance from the baseline to the lowest glyph edge
+	if (!f.face || !f.face->ok) return f.size * 0.12f;
+	const float scale = stbtt_ScaleForMappingEmToPixels(&f.face->info, f.size);
+	int a = 0, d = 0, g = 0;
+	stbtt_GetFontVMetrics(&f.face->info, &a, &d, &g);
+	return -d * scale;
+}
+
 float ascent_of(const FontEntry& f) {
 	if (!f.face || !f.face->ok) return f.size * 0.88f;
 	const float scale = stbtt_ScaleForMappingEmToPixels(&f.face->info, f.size);
@@ -198,7 +206,7 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 		}
 		out.width = std::max(out.width, x);
 	}
-	out.height = line_top + (line_empty ? 0.f : std::max(pitch, base_dy + size)); // negative row spacing must not clip the glyphs
+	out.height = line_top + (line_empty ? 0.f : std::max(pitch, base_dy + asc + descent_of(st.font))); // negative row spacing must not clip the glyphs
 	return out;
 }
 
