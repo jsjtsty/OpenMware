@@ -60,6 +60,7 @@ struct TextRef : SpriteRef {
 		Renderer2D* r = host().renderer;
 		if (!r) return;
 		style.font = r->fonts().lookup(face);
+		if (host().verbose) std::printf("[text] face '%s' size %.0f\n", face.c_str(), style.font.size);
 		style.ruby_font = r->fonts().lookup(ruby_face.empty() ? face : ruby_face);
 		for (int i = 0; i < 3; i++) {
 			style.color[i] = font_color[0][i];

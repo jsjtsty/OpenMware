@@ -95,6 +95,8 @@ FontFace* FontLibrary::face_for_family(const std::string& family) {
 			break;
 		}
 	}
+	// Families the game asks for but does not ship (e.g. "Droid Serif" for subtitles): pick the bundled face of the same style.
+	if (best_path.empty() && want.find("serif") != std::string::npos && want.find("sans") == std::string::npos) best_path = kFontFiles[1];
 	if (best_path.empty()) best_path = kFontFiles[0];
 	auto it = faces_.find(best_path);
 	if (it != faces_.end()) return it->second.get();
