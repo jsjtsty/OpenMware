@@ -141,6 +141,26 @@ def attach_decompilation(text: str, functions: list[Function], failed: set[int])
     silently assigning a body to the wrong overloaded/demangled function.
     The lexical scan ignores braces in comments, string and character literals.
     """
+    markers = list(re.finditer(r"(?m)^// OMW_FUNCTION_ADDRESS: ([0-9a-fA-F]+)\s*$", text))
+    if markers:
+        by_address = {f.address: f for f in functions}
+        seen = set()
+        newlines = [m.start() for m in re.finditer("\n", text)]
+        for i, marker in enumerate(markers):
+            address = int(marker[1], 16)
+            if address in seen or address not in by_address:
+                raise ValueError(f"Unknown/duplicate export marker {address:x}")
+            seen.add(address)
+            f = by_address[address]
+            end = markers[i + 1].start() if i + 1 < len(markers) else len(text)
+            f.source = text[marker.end():end].strip()
+            f.line = bisect.bisect_left(newlines, marker.end()) + 1
+            opening = next((m.start() for m in TOKENS.finditer(f.source) if m[0] == "{"), None)
+            f.body = f.source[opening + 1:f.source.rfind("}")] if opening is not None else ""
+        expected = {f.address for f in functions if f.size > 0 and f.address not in failed}
+        if seen != expected:
+            raise ValueError("Export address markers differ from function inventory")
+        return len(markers)
     blocks = []
     depth, boundary, opening = 0, 0, 0
     for match in TOKENS.finditer(text):
@@ -335,7 +355,7 @@ def cell(text: str) -> str:
     return " ".join(text.split()).replace("|", r"\|").replace("`", "'")
 
 
-def class_markdown(info: ClassInfo, classes: dict[str, ClassInfo], functions: dict[int, Function], filenames: dict[str, str]) -> tuple[str, set[int]]:
+def class_markdown(info: ClassInfo, classes: dict[str, ClassInfo], functions: dict[int, Function], filenames: dict[str, str], decompile_name: str = "Mware.dll.c") -> tuple[str, set[int]]:
     ancestors = [name for name, _, _ in info.hierarchy if name != info.name]
     if not ancestors:
         ancestors = [name for name in split_bases(info.bases_text) if name != info.name]
@@ -383,7 +403,7 @@ def class_markdown(info: ClassInfo, classes: dict[str, ClassInfo], functions: di
         function = functions.get(address)
         if address in copied:
             slots = [str(i) for i, target in enumerate(info.slots) if target == address]
-            lines.extend([f'<a id="function-{address:08x}"></a>', f"### {va(address)} — {function.name}", "", f"Slots: {', '.join(slots)}. Size: {function.size} bytes. Source: `../decompile/Mware.dll.c`, line {function.line}.", ""])
+            lines.extend([f'<a id="function-{address:08x}"></a>', f"### {va(address)} — {function.name}", "", f"Slots: {', '.join(slots)}. Size: {function.size} bytes. Source: `../decompile/{decompile_name}`, line {function.line}.", ""])
             if function.calls:
                 lines.extend(["Direct `FUN_` callees (text scan): " + ", ".join(f"`FUN_{target:08x}`" for target in sorted(function.calls)) + ".", ""])
             longest = max([len(m.group()) for m in re.finditer(r"`+", function.source)] or [0])
@@ -404,7 +424,8 @@ def main() -> int:
     args = parser.parse_args()
     analysis = args.analysis_root.resolve()
     output = (args.out or analysis / "classes").resolve()
-    inputs = [analysis / "rtti_classes.tsv", analysis / "functions.tsv", analysis / "strings.tsv", analysis / "decompile/Mware.dll.c", analysis / "decompile/failures.tsv", args.dll.resolve()]
+    decompile_name = args.dll.name + ".c"
+    inputs = [analysis / "rtti_classes.tsv", analysis / "functions.tsv", analysis / "strings.tsv", analysis / "decompile" / decompile_name, analysis / "decompile/failures.tsv", args.dll.resolve()]
     # An output directory must not alias the source export directory.
     if output == analysis or any(path == output or output in path.parents for path in inputs):
         parser.error("output directory would overwrite existing analysis inputs")
@@ -442,7 +463,7 @@ def main() -> int:
               ((c.name, va(c.address), len(c.slots), c.bases_text) for c in classes.values() if c.address is not None))
     body_addresses = set()
     for name, filename_ in filenames.items():
-        markdown, copied = class_markdown(classes[name], classes, by_address, filenames)
+        markdown, copied = class_markdown(classes[name], classes, by_address, filenames, decompile_name)
         (output / filename_).write_text(markdown, encoding="utf-8")
         body_addresses.update(copied)
     fun_targets = {f.address for f in functions if f.name.startswith("FUN_")} | set(callers)
@@ -469,7 +490,7 @@ def main() -> int:
     }
     (output / "stats.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "README.md").write_text(
-        "# Mware class and function index\n\n"
+        f"# {args.dll.name} class and function index\n\n"
         f"Generated by `scripts/index_mware_classes.py` from {stats['classes']} RTTI classes: "
         f"{stats['classes_with_vtables']} resolved vtables, {len(filenames)} class documents "
         f"({stats['class_documents_with_vtables']} with vtables). Compiler/CRT/lambda classes remain in index.tsv but their Markdown is omitted.\n\n"

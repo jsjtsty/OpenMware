@@ -29,7 +29,7 @@ include(cmake/OmwShaders.cmake)
 find_package(WebP CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_image.h" REQUIRED)
 
-add_library(omw_game STATIC src/game/anim.cpp src/game/stage.cpp src/game/game_files.cpp)
+add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/stage.cpp src/game/game_files.cpp)
 target_include_directories(omw_game PUBLIC src)
 target_link_libraries(omw_game PUBLIC omw_archive SDL3::SDL3)
 
@@ -83,3 +83,12 @@ target_link_libraries(nutdis PRIVATE squirrel2::squirrel2)
 add_executable(omw apps/omw.cpp)
 target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
 add_dependencies(omw omw_shaders)
+
+# Standalone SQAction1D tempo-curve checks; does not link the script runtime.
+add_executable(test_easing tests/test_easing.cpp src/script/easing.cpp)
+target_include_directories(test_easing PRIVATE src)
+if(MSVC)
+	target_compile_options(test_easing PRIVATE /fp:strict)
+else()
+	target_compile_options(test_easing PRIVATE -ffp-contract=off)
+endif()

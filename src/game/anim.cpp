@@ -1,9 +1,8 @@
 #include "game/anim.h"
+#include "script/easing.h"
 
 namespace omw {
 
-TempoFn g_tempo_eval = [](int, float src, float dst, float duration, float timer) -> float {
-	return duration > 0.f ? src + (dst - src) * (timer / duration) : dst;
-};
+TempoFn g_tempo_eval = eval_tempo;
 
 } // namespace omw
