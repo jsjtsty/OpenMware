@@ -978,6 +978,7 @@ common_call:
 				{ Raise_Error(_SC("cloning a %s"), GetTypeName(STK(arg1))); SQ_THROW();}
 				continue;
 			case _OP_TYPEOF: TypeOf(STK(arg1), TARGET); continue;
+			case _OP_TOSTRING: ToString(STK(arg1), TARGET); continue;
 			case _OP_PUSHTRAP:{
 				SQInstruction *_iv = _funcproto(_closure(ci->_closure)->_function)->_instructions;
 				_etraps.push_back(SQExceptionTrap(_top,_stackbase, &_iv[(ci->_ip-_iv)+arg1], arg0)); traps++;

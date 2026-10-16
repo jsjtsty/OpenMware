@@ -60,7 +60,7 @@ struct TextRef : SpriteRef {
 		Renderer2D* r = host().renderer;
 		if (!r) return;
 		style.font = r->fonts().lookup(face);
-		if (host().verbose) std::printf("[text] face '%s' size %.0f\n", face.c_str(), style.font.size);
+		if (host().verbose) std::printf("[text] face '%s' size %.0f color %.2f %.2f %.2f\n", face.c_str(), style.font.size, font_color[0][0], font_color[0][1], font_color[0][2]);
 		style.ruby_font = r->fonts().lookup(ruby_face.empty() ? face : ruby_face);
 		for (int i = 0; i < 3; i++) {
 			style.color[i] = font_color[0][i];
@@ -159,10 +159,10 @@ SQInteger set_shadow(HSQUIRRELVM v) { // (type, gap, power, alpha exponent)
 SQInteger set_font_color(HSQUIRRELVM v) { // (slot, r, g, b, time, tempo)
 	TextRef* t = txt(v);
 	const int i = static_cast<int>(arg_int(v, 2));
-	if (i >= 0 && i < 6) {
-		t->font_color[i][0] = arg_float(v, 3);
-		t->font_color[i][1] = arg_float(v, 4);
-		t->font_color[i][2] = arg_float(v, 5);
+	for (int k = i < 0 ? 0 : i; k < (i < 0 ? 6 : i + 1) && k < 6; k++) { // slot -1 = every slot
+		t->font_color[k][0] = arg_float(v, 3);
+		t->font_color[k][1] = arg_float(v, 4);
+		t->font_color[k][2] = arg_float(v, 5);
 		t->dirty = true;
 	}
 	return 0;
@@ -176,10 +176,10 @@ SQInteger get_font_color(HSQUIRRELVM v) {
 SQInteger set_shadow_color(HSQUIRRELVM v) {
 	TextRef* t = txt(v);
 	const int i = static_cast<int>(arg_int(v, 2));
-	if (i >= 0 && i < 6) {
-		t->shadow_color[i][0] = arg_float(v, 3);
-		t->shadow_color[i][1] = arg_float(v, 4);
-		t->shadow_color[i][2] = arg_float(v, 5);
+	for (int k = i < 0 ? 0 : i; k < (i < 0 ? 6 : i + 1) && k < 6; k++) { // slot -1 = every slot
+		t->shadow_color[k][0] = arg_float(v, 3);
+		t->shadow_color[k][1] = arg_float(v, 4);
+		t->shadow_color[k][2] = arg_float(v, 5);
 		t->dirty = true;
 	}
 	return 0;

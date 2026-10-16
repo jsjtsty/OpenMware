@@ -83,6 +83,7 @@ enum SQOpcode
 	_OP_THROW=				0x3A,
 	_OP_CLASS=				0x3B,
 	_OP_NEWSLOTA=			0x3C,
+	_OP_TOSTRING=			0x3D, // Mware extension
 };							  
 
 struct SQInstructionDesc {	  

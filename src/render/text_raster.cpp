@@ -127,7 +127,9 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 	TextLayout out;
 	const float size = st.font.size;
 	const float ruby_h = st.ruby_font.size;
-	const float base_dy = std::max(0.f, ruby_h + st.ruby_offset); // top of the base glyph box inside a line
+	bool has_ruby = false; // the room above a line is only reserved when the text carries ruby
+	for (const TextRun& r : runs) has_ruby = has_ruby || !r.ruby.empty();
+	const float base_dy = has_ruby ? std::max(0.f, ruby_h + st.ruby_offset) : 0.f; // top of the base glyph box inside a line
 	const float pitch = base_dy + size + st.row_space;
 	const float limit = st.field_w > 0 ? static_cast<float>(st.field_w) : 1e9f;
 	const float asc = ascent_of(st.font), ruby_asc = ascent_of(st.ruby_font);
@@ -196,7 +198,7 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 		}
 		out.width = std::max(out.width, x);
 	}
-	out.height = line_top + (line_empty ? 0.f : pitch);
+	out.height = line_top + (line_empty ? 0.f : std::max(pitch, base_dy + size)); // negative row spacing must not clip the glyphs
 	return out;
 }
 
