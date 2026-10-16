@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
 	// Fixed-timestep loop: the game logic always advances in 1/60 s steps; rendering runs at the display's rate. A time accumulator
 	// decides how many logic steps are due per presented frame (none on a 144 Hz display half the time, several after a stall).
 	const bool realtime = frames < 0 && shot.empty() && shots_at.empty();
+	const bool render_all = std::getenv("OMW_RENDER_ALL") != nullptr; // headless runs normally skip drawing; effects that read the screen need it
 	const Uint64 step_ns = 1000000000ull / 60;
 	Uint64 last_ns = SDL_GetTicksNS(), acc_ns = step_ns;
 	int catch_up = 0;
@@ -168,7 +169,7 @@ int main(int argc, char** argv) {
 			}
 			renderer.save_frame_png(items, shot);
 			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.empty() ? size_t(0) : items.back().items.size(), stage.size());
-		} else if (shot.empty() && shots_at.empty() && present) {
+		} else if ((render_all || (shot.empty() && shots_at.empty())) && present) {
 			renderer.render_frame(items);
 		}
 		if (host.app.closing) running = false;

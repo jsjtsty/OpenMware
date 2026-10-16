@@ -129,6 +129,11 @@ DrawItem make_item(const Sprite* s) {
 		d.rh = s->sub_h > 0 ? static_cast<float>(s->sub_h) : s->height;
 	} else if (s->is_capture && s->capturing) {
 		d.snap = DrawItem::Snap::Capture;
+		s->drawn_capturing = true;
+		if (s->freeze_after_draw) {
+			s->freeze_after_draw = false;
+			const_cast<Sprite*>(s)->capturing = false; // this frame still takes the picture
+		}
 	}
 	d.premult = s->is_target && !s->is_capture;
 	if (const auto m = s->mask.lock(); m && m->kind != Sprite::Kind::None) {

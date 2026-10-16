@@ -123,7 +123,24 @@ SQInteger create_movie(HSQUIRRELVM v) { // (path, alpha) -> 0 on success
 	return 1;
 }
 
+// A screen snapshot (createScreen) shares the movie verbs: play() follows the screen, stop() / pause() freeze it.
+bool screen_snapshot(HSQUIRRELVM v, bool follow) {
+	auto* r = sqb::self<SpriteRef>(v);
+	Sprite* s = r ? r->sprite.get() : nullptr;
+	if (host().verbose) std::printf("[f%d] [screen] %s follow=%d capture=%d drawn=%d\n", host().frame, s ? s->name.c_str() : "?", follow ? 1 : 0, s && s->is_capture ? 1 : 0, s && s->drawn_capturing ? 1 : 0);
+	if (!s || !s->is_capture) return false;
+	if (follow) {
+		s->capturing = true;
+		s->freeze_after_draw = false;
+	} else if (s->capturing && !s->drawn_capturing) {
+		s->freeze_after_draw = true; // nothing has been captured yet: let one frame through first
+	} else {
+		s->capturing = false;
+	}
+	return true;
+}
 SQInteger play(HSQUIRRELVM v) {
+	if (screen_snapshot(v, true)) return 0;
 	if (MovieState* m = movie_of(v)) {
 		if (host().verbose) std::printf("[f%d] [movie] play %s\n", host().frame, m->path.c_str());
 		m->start();
@@ -131,10 +148,12 @@ SQInteger play(HSQUIRRELVM v) {
 	return 0;
 }
 SQInteger stop(HSQUIRRELVM v) {
+	if (screen_snapshot(v, false)) return 0;
 	if (MovieState* m = movie_of(v)) m->stop();
 	return 0;
 }
 SQInteger pause(HSQUIRRELVM v) {
+	if (screen_snapshot(v, false)) return 0;
 	if (MovieState* m = movie_of(v); m && m->playing) {
 		m->paused = true;
 		if (m->voice >= 0) host().audio->pause(m->voice);

@@ -62,6 +62,8 @@ struct Sprite {
 	// SQSpriteRenderTarget: `texture` is an offscreen surface (w x h) that the sprites assigned to it are drawn into;
 	// a capture target instead copies what has been drawn below it (shake / filter sprites), while `capturing`.
 	bool is_target = false, is_capture = false, capturing = true;
+	// stop() on a capture that has not been drawn yet: take the picture in the next frame, then freeze.
+	mutable bool freeze_after_draw = false, drawn_capturing = false;
 	std::weak_ptr<Sprite> surface; // SetSurface: the target this sprite is drawn into (none: the screen)
 
 	// Post effects of the sprite's picture (values as the scripts give them after their /1000 scaling).

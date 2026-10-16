@@ -103,6 +103,20 @@ SQInteger create_screen(HSQUIRRELVM v) { // (u, v, w, h): shows the region of wh
 	s->height = arg_float(v, 5, -1) > 0 ? arg_float(v, 5) : static_cast<float>(Stage::kHeight);
 	s->sub_w = static_cast<int>(s->width);
 	s->sub_h = static_cast<int>(s->height);
+	if (s->sub_x == 0 && s->sub_y == 0 && s->width >= Stage::kWidth && s->height >= Stage::kHeight && host().renderer) {
+		// The whole frame: a capture sprite, so that stop() (the game's "Passive" request) can freeze the picture while
+		// the scene behind it is hidden (menus, dialogs, save thumbnails).
+		const int ss = host().renderer->supersample();
+		if ((s->texture = host().renderer->create_target(Stage::kWidth * ss, Stage::kHeight * ss))) {
+			s->kind = Sprite::Kind::Image;
+			s->is_capture = true;
+			s->capturing = true;
+			s->sub_x = s->sub_y = s->sub_w = s->sub_h = 0;
+			s->width = static_cast<float>(Stage::kWidth);
+			s->height = static_cast<float>(Stage::kHeight);
+		}
+	}
+	TRACE_SPRITE("[f%d] [sprite %s] createScreen %dx%d at %d,%d capture=%d tex=%d\n", host().frame, s->name.c_str(), s->sub_w, s->sub_h, s->sub_x, s->sub_y, s->is_capture ? 1 : 0, s->texture ? 1 : 0);
 	sq_pushinteger(v, 0);
 	return 1;
 }
