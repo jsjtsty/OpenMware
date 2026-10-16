@@ -34,7 +34,9 @@ enum BlendMode : int {
 constexpr bool blend_reads_destination(int mode) { return mode >= BLEND_OVERLAY && mode < BLEND_MODE_COUNT; }
 
 // Fixed-function state. Alpha channel is always ADD ONE/ONE and colour writes are RGB only (as in the original).
-inline SDL_GPUColorTargetBlendState blend_state(int mode) {
+// `to_target`: drawing into an offscreen surface that has to keep its own alpha (it then holds premultiplied colour);
+// `premult`: the source is such a surface (premultiplied), composited with ONE / INV_SRC_ALPHA (NORMAL blend only).
+inline SDL_GPUColorTargetBlendState blend_state(int mode, bool to_target = false, bool premult = false) {
 	SDL_GPUColorTargetBlendState s{};
 	s.color_write_mask = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B;
 	s.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
@@ -64,7 +66,13 @@ inline SDL_GPUColorTargetBlendState blend_state(int mode) {
 	default: // NORMAL and all in-shader modes
 		s.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
 		s.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+		if (premult && mode == BLEND_NORMAL) s.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
 		break;
+	}
+	if (to_target) {
+		s.color_write_mask = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+		s.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+		s.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
 	}
 	return s;
 }

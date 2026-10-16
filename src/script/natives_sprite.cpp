@@ -19,6 +19,11 @@ SpriteRef::~SpriteRef() {
 		sprite->tick = nullptr;
 		sprite->texture = nullptr;
 	}
+	ScriptHost* h = ScriptHost::current();
+	if ((sprite->is_target || sprite->is_capture) && sprite->texture) { // the surface belongs to the renderer
+		if (h && h->renderer) h->renderer->destroy_dynamic_texture(sprite->texture);
+		sprite->texture = nullptr;
+	}
 	sprite->released = true; // the script dropped its last reference: the sprite leaves the stage
 	if (ScriptHost::current() && ScriptHost::current()->verbose)
 		std::printf("[f%d] [sprite %s] released\n", ScriptHost::current()->frame, sprite->name.c_str());
@@ -89,13 +94,52 @@ SQInteger create_color(HSQUIRRELVM v) { // (w, h, r, g, b)
 	return 1;
 }
 
-SQInteger create_screen(HSQUIRRELVM v) { // (x, y, w, h): capture of the screen; not drawn yet (TODO)
+SQInteger create_screen(HSQUIRRELVM v) { // (u, v, w, h): shows the region of what has been drawn below it
 	Sprite* s = spr(v);
 	s->kind = Sprite::Kind::Screen;
+	s->sub_x = static_cast<int>(std::max(0.f, arg_float(v, 2, 0)));
+	s->sub_y = static_cast<int>(std::max(0.f, arg_float(v, 3, 0)));
 	s->width = arg_float(v, 4, -1) > 0 ? arg_float(v, 4) : static_cast<float>(Stage::kWidth);
 	s->height = arg_float(v, 5, -1) > 0 ? arg_float(v, 5) : static_cast<float>(Stage::kHeight);
+	s->sub_w = static_cast<int>(s->width);
+	s->sub_h = static_cast<int>(s->height);
 	sq_pushinteger(v, 0);
 	return 1;
+}
+
+// SQSpriteRenderTarget.create(w, h, capture): an offscreen surface; a capture target instead copies what is drawn below it.
+SQInteger target_create(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	const int w = std::max(1, static_cast<int>(arg_int(v, 2))), h = std::max(1, static_cast<int>(arg_int(v, 3)));
+	s->is_capture = arg_int(v, 4, 0) != 0;
+	s->is_target = !s->is_capture;
+	s->capturing = true;
+	s->texture = host().renderer ? host().renderer->create_target(w, h) : nullptr;
+	if (!s->texture) {
+		sq_pushinteger(v, -1);
+		return 1;
+	}
+	s->kind = Sprite::Kind::Image;
+	s->width = static_cast<float>(w);
+	s->height = static_cast<float>(h);
+	TRACE_SPRITE("[f%d] [sprite %s] target %dx%d capture=%d\n", host().frame, s->name.c_str(), w, h, s->is_capture ? 1 : 0);
+	sq_pushinteger(v, 0);
+	return 1;
+}
+SQInteger target_set_capture(HSQUIRRELVM v) { spr(v)->capturing = arg_int(v, 2) != 0; return 0; }
+SQInteger target_play(HSQUIRRELVM v) { spr(v)->capturing = true; return 0; }
+SQInteger target_stop(HSQUIRRELVM v) { spr(v)->capturing = false; return 0; }
+SQInteger target_is_capture(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->is_capture && spr(v)->capturing); return 1; }
+SQInteger target_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
+SQInteger target_noop(HSQUIRRELVM) { return 0; }
+
+SQInteger set_surface(HSQUIRRELVM v) { // (target sprite name; "null"/empty: the screen)
+	const std::string name = arg_string(v, 2);
+	Sprite* s = spr(v);
+	const auto t = host().stage && !name.empty() && name != "null" && name != s->name ? host().stage->find(name) : nullptr;
+	s->surface = t && t->is_target ? t : nullptr;
+	TRACE_SPRITE("[f%d] [sprite %s] setSurface %s -> %d\n", host().frame, s->name.c_str(), name.c_str(), s->surface.lock() ? 1 : 0);
+	return 0;
 }
 
 SQInteger set_priority(HSQUIRRELVM v) { spr(v)->priority = static_cast<int>(arg_int(v, 2)); return 0; }
@@ -279,7 +323,7 @@ SQInteger is_transitioning(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->trans.active)
 SQInteger get_transition_timer(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->trans.active ? spr(v)->trans.duration - spr(v)->trans.timer : 0.f); return 1; }
 SQInteger get_transition_file(HSQUIRRELVM v) { sq_pushstring(v, spr(v)->trans_file.c_str(), -1); return 1; }
 
-static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor);
+static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool render_target = false);
 void register_sprite_class(ScriptHost& h) {
 	h.begin_class("SQSprite");
 	register_sprite_members(h, ctor);
@@ -288,16 +332,33 @@ void register_sprite_class(ScriptHost& h) {
 	register_sprite_members(h, mask_ctor);
 	h.add_method("setDiffuseOnly", set_diffuse_only);
 	h.end_class();
+	h.begin_class("SQSpriteRenderTarget");
+	register_sprite_members(h, ctor, true);
+	h.end_class();
 }
 
-static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor) {
+static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool render_target) {
 	h.add_method("constructor", constructor);
-	h.add_method("create", create);
-	h.add_method("createSubresource", create);
-	h.add_method("createColor", create_color);
-	h.add_method("createScreen", create_screen);
+	if (render_target) {
+		h.add_method("create", target_create);
+		h.add_method("setCapture", target_set_capture);
+		h.add_method("play", target_play);
+		h.add_method("pause", target_stop);
+		h.add_method("stop", target_stop);
+		h.add_method("isCaptureEnabled", target_is_capture);
+		h.add_method("isDelayedRendering", target_false);
+		for (const char* n : {"setDelayRendering", "setCaptureTarget", "setCopyTarget", "createCustomEffect", "setCustomEffectParameter",
+							  "saveImage", "clear", "serialize", "deserialize", "setBlurMode", "setTextureFiltering"})
+			h.add_method(n, target_noop);
+	} else {
+		h.add_method("create", create);
+		h.add_method("createSubresource", create);
+		h.add_method("createColor", create_color);
+		h.add_method("createScreen", create_screen);
+		register_movie_methods(h);
+	}
+	h.add_method("setSurface", set_surface);
 	register_sprite_property_methods(h);
-	register_movie_methods(h);
 	h.add_method("setClickable", set_clickable);
 	h.add_method("isOver", is_over);
 	h.add_method("isDown", is_down);

@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
+#include <map>
+#include <set>
 
 namespace omw {
 
@@ -77,6 +80,36 @@ DrawQuad make_quad(const Sprite* s) {
 	d.u[3] = u0; d.v[3] = v1;
 	return d;
 }
+
+DrawItem make_item(const Sprite* s) {
+	DrawItem d;
+	static_cast<DrawQuad&>(d) = make_quad(s);
+	d.blend = s->blend;
+	if (s->kind == Sprite::Kind::Screen) {
+		d.snap = DrawItem::Snap::Screen;
+		d.rx = static_cast<float>(s->sub_x);
+		d.ry = static_cast<float>(s->sub_y);
+		d.rw = s->sub_w > 0 ? static_cast<float>(s->sub_w) : s->width;
+		d.rh = s->sub_h > 0 ? static_cast<float>(s->sub_h) : s->height;
+	} else if (s->is_capture && s->capturing) {
+		d.snap = DrawItem::Snap::Capture;
+	}
+	d.premult = s->is_target && !s->is_capture;
+	if (const auto m = s->mask.lock(); m && m->kind != Sprite::Kind::None) {
+		d.has_mask = true;
+		d.mask = make_quad(m.get());
+	}
+	if (const auto m = s->displacement.lock(); m && m->texture) {
+		d.has_disp = true;
+		d.disp = make_quad(m.get());
+	}
+	if (s->trans_on && s->trans_tex) {
+		d.trans_tex = s->trans_tex;
+		d.trans_now = std::clamp(s->trans.value[0], 0.f, 1.f);
+		d.trans_rate = s->trans_rate;
+	}
+	return d;
+}
 } // namespace
 
 std::shared_ptr<Sprite> Stage::find(const std::string& name) const {
@@ -85,33 +118,42 @@ std::shared_ptr<Sprite> Stage::find(const std::string& name) const {
 	return nullptr;
 }
 
-void Stage::build_draw_list(std::vector<DrawItem>& out) const {
+void Stage::build_draw_list(DrawList& out) const {
+	out.clear();
 	std::vector<const Sprite*> order;
 	order.reserve(sprites_.size());
 	for (const auto& s : sprites_)
-		if (s->kind != Sprite::Kind::None && !s->is_mask && s->fade.value[0] > 0.f) order.push_back(s.get());
+		if (s->kind != Sprite::Kind::None && !s->is_mask && !s->released && s->fade.value[0] > 0.f) order.push_back(s.get());
 	std::stable_sort(order.begin(), order.end(), [](const Sprite* a, const Sprite* b) {
 		return a->priority != b->priority ? a->priority < b->priority : a->order < b->order;
 	});
+
+	// Sprites per surface (null: the game frame), then the passes with the surfaces a surface contains first.
+	std::map<const Sprite*, std::vector<std::pair<const Sprite*, DrawItem>>> buckets;
 	for (const Sprite* s : order) {
-		DrawItem d;
-		static_cast<DrawQuad&>(d) = make_quad(s);
-		d.blend = s->blend;
-		if (const auto m = s->mask.lock(); m && m->kind != Sprite::Kind::None) {
-			d.has_mask = true;
-			d.mask = make_quad(m.get());
-		}
-		if (const auto m = s->displacement.lock(); m && m->texture) {
-			d.has_disp = true;
-			d.disp = make_quad(m.get());
-		}
-		if (s->trans_on && s->trans_tex) {
-			d.trans_tex = s->trans_tex;
-			d.trans_now = std::clamp(s->trans.value[0], 0.f, 1.f);
-			d.trans_rate = s->trans_rate;
-		}
-		out.push_back(d);
+		const auto t = s->surface.lock();
+		const Sprite* target = t && t->is_target && !t->released && t.get() != s && t->texture ? t.get() : nullptr;
+		buckets[target].emplace_back(s, make_item(s));
 	}
+	std::set<const Sprite*> emitted;
+	std::function<void(const Sprite*, int)> emit = [&](const Sprite* target, int depth) {
+		if (!emitted.insert(target).second || depth > 16) return;
+		auto& list = buckets[target];
+		for (const auto& [s, item] : list)
+			if (s->is_target && !s->is_capture) emit(s, depth + 1);
+		RenderPass pass;
+		if (target) {
+			pass.target = target->texture;
+			pass.w = target->texture->w;
+			pass.h = target->texture->h;
+		} else {
+			pass.w = kWidth;
+			pass.h = kHeight;
+		}
+		for (auto& [s, item] : list) pass.items.push_back(std::move(item));
+		out.push_back(std::move(pass));
+	};
+	emit(nullptr, 0); // surfaces whose own parent is invisible are not reached, and so not drawn
 }
 
 namespace {

@@ -29,11 +29,13 @@ public:
 	void replace_dynamic_texture(Texture* t, int w, int h, const uint8_t* rgba);
 	void destroy_dynamic_texture(Texture* t);
 	FontLibrary& fonts() { return fonts_; }
+	// Offscreen surface the stage draws sprites into (SQSpriteRenderTarget); freed with destroy_dynamic_texture.
+	Texture* create_target(int w, int h);
 
 	// Renders the draw list and presents. Returns false when the window is minimised (no frame was produced).
-	bool render_frame(const std::vector<DrawItem>& items);
+	bool render_frame(const DrawList& list);
 	// Renders only into the offscreen game frame and saves it as PNG (for tests/screenshots).
-	bool save_frame_png(const std::vector<DrawItem>& items, const std::string& path);
+	bool save_frame_png(const DrawList& list, const std::string& path);
 
 private:
 	struct Vertex {
@@ -41,9 +43,16 @@ private:
 		float r, g, b, a;
 		float u, v;
 	};
-	SDL_GPUGraphicsPipeline* pipeline(int blend, const std::string& ps_name, Uint32 samplers);
+	// Helper textures of a pass target size: picture of the current sprite's mask, and a copy of the target so far
+	// (blend modes that read the destination, screen/capture sprites).
+	struct Scratch {
+		SDL_GPUTexture* mask = nullptr;
+		SDL_GPUTexture* dest = nullptr;
+	};
+	SDL_GPUGraphicsPipeline* pipeline(int blend, const std::string& ps_name, Uint32 samplers, bool to_target, bool premult);
 	Texture* make_rule_texture(float now, float rate);
-	void draw_items(SDL_GPUCommandBuffer* cmd, const std::vector<DrawItem>& items);
+	Scratch& scratch(int w, int h);
+	void draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list);
 	void ensure_vertex_buffer(size_t bytes);
 
 	GpuContext* gpu_ = nullptr;
@@ -51,8 +60,7 @@ private:
 	SDL_GPUShader* vs_ = nullptr;
 	SDL_GPUSampler* sampler_linear_ = nullptr;
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
-	SDL_GPUTexture* mask_ = nullptr;  // screen-space picture of the current sprite's mask
-	SDL_GPUTexture* dest_ = nullptr;  // copy of the frame so far, for blend modes that read the destination
+	std::map<std::pair<int, int>, Scratch> scratch_;
 	Texture* rule_ = nullptr;         // transition rule ramp
 	SDL_GPUBuffer* vbuf_ = nullptr;
 	SDL_GPUTransferBuffer* vtransfer_ = nullptr;
@@ -61,7 +69,7 @@ private:
 	std::vector<std::unique_ptr<Texture>> dynamic_;
 	FontLibrary fonts_;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
-	std::map<std::pair<int, std::string>, SDL_GPUGraphicsPipeline*> pipelines_;
+	std::map<std::pair<int, std::string>, SDL_GPUGraphicsPipeline*> pipelines_; // key: blend | flags << 8
 	std::map<std::string, SDL_GPUShader*> shaders_;
 	std::vector<Vertex> verts_;
 };

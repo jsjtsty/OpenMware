@@ -1,0 +1,4 @@
+::k <- SQSprite("k"); ::k.createColor(1024,576,20,20,60); ::k.setPriority(29000);
+::a <- SQSprite("a"); ::a.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::a.setPriority(29500);
+::C <- SQSpriteRenderTarget("C"); ::C.create(1024, 576, 1); ::C.setPriority(30000); ::C.move(40, 25, 0, 0); ::C.scale(0.6, 0.6, 0, 0);
+::b <- SQSprite("b"); ::b.createColor(200, 120, 255, 60, 60); ::b.setPriority(30001); ::b.move(300, 200, 0, 0);

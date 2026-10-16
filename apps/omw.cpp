@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
 
 	InputState input;
 	host.input = &input;
-	std::vector<DrawItem> items;
+	DrawList items;
 	bool running = true;
 	for (int frame = 0; running && (frames < 0 || frame < frames); frame++) {
 		for (const auto& [f, k] : taps)
@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
 		if (last && !shot.empty()) {
 			if (trace) stage.dump();
 			renderer.save_frame_png(items, shot);
-			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.size(), stage.size());
+			std::printf("saved %s (%zu quads, %zu sprites)\n", shot.c_str(), items.empty() ? size_t(0) : items.back().items.size(), stage.size());
 		} else if (shot.empty()) {
 			renderer.render_frame(items);
 		}

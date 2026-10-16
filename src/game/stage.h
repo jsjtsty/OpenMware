@@ -49,6 +49,10 @@ struct Sprite {
 	std::string trans_file;
 	Texture* trans_tex = nullptr;
 	bool clickable = false, check_alpha = false; // SetClickable: takes part in mouse hit testing
+	// SQSpriteRenderTarget: `texture` is an offscreen surface (w x h) that the sprites assigned to it are drawn into;
+	// a capture target instead copies what has been drawn below it (shake / filter sprites), while `capturing`.
+	bool is_target = false, is_capture = false, capturing = true;
+	std::weak_ptr<Sprite> surface; // SetSurface: the target this sprite is drawn into (none: the screen)
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
 	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)
@@ -73,7 +77,20 @@ struct DrawItem : DrawQuad {
 	DrawQuad mask, disp;
 	Texture* trans_tex = nullptr; // null: no transition
 	float trans_now = 0.f, trans_rate = 0.3f;
+	// Snapshots of the pass target drawn so far: Screen sprites show the region (rx, ry, rw, rh) of it; capture sprites first
+	// copy it into their own texture.
+	enum class Snap { None, Screen, Capture } snap = Snap::None;
+	float rx = 0, ry = 0, rw = 0, rh = 0;
+	bool premult = false; // the texture is an offscreen surface (premultiplied alpha)
 };
+
+// One render pass: the items drawn into `target` (null: the game frame) in order.
+struct RenderPass {
+	Texture* target = nullptr;
+	int w = 0, h = 0;
+	std::vector<DrawItem> items;
+};
+using DrawList = std::vector<RenderPass>; // surfaces first, the game frame last
 
 class Stage {
 public:
@@ -83,8 +100,8 @@ public:
 	void remove(const Sprite* s);
 	std::shared_ptr<Sprite> find(const std::string& name) const; // most recent sprite with that name
 	void update(float dt_ms);
-	// Visible sprites back-to-front as quads.
-	void build_draw_list(std::vector<DrawItem>& out) const;
+	// Visible sprites back-to-front as quads, grouped into the passes of their surfaces.
+	void build_draw_list(DrawList& out) const;
 	// Finds the clickable sprite under the cursor (topmost wins); call once per frame before the script runs.
 	void update_pointer(float x, float y);
 	const Sprite* hot() const { return hot_; }
