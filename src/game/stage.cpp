@@ -126,7 +126,7 @@ void Stage::build_draw_list(DrawList& out) const {
 	std::vector<const Sprite*> order;
 	order.reserve(sprites_.size());
 	for (const auto& s : sprites_)
-		if (s->kind != Sprite::Kind::None && !s->is_mask && !s->released && s->fade.value[0] > 0.f) order.push_back(s.get());
+		if (s->kind != Sprite::Kind::None && !s->is_mask && !s->released && !s->erase && s->fade.value[0] > 0.f) order.push_back(s.get());
 	std::stable_sort(order.begin(), order.end(), [](const Sprite* a, const Sprite* b) {
 		return a->priority != b->priority ? a->priority < b->priority : a->order < b->order;
 	});

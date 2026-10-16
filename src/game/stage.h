@@ -20,7 +20,7 @@ struct Sprite {
 	std::string name;
 	Kind kind = Kind::None;
 	int priority = 0;
-	bool erase = false;    // script-visible flag (SetErase); does not remove the sprite by itself
+	bool erase = false;    // SetErase(true): the sprite is hidden (not drawn); it still exists
 	bool released = false; // the script dropped its last reference: the sprite leaves the stage
 	float time_scale = 1.f;
 	int blend = BLEND_NORMAL;
