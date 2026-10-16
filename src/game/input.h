@@ -27,12 +27,19 @@ struct InputState {
 	// Test hook: the key goes down on the next frame and is released on the one after (as a single tap).
 	void tap_key(int code) { tap_[code & 255] = 2; }
 
+	// Test hooks: place the cursor (overrides the real one from then on) and click the left button (down next frame, up after).
+	void set_cursor(float x, float y) { override_ = true; mouse_x = x; mouse_y = y; }
+	void tap_mouse() { mouse_tap_ = 2; }
+
 	int mouse_state(int button) const;
 	// Script key query: held (trigger=false), or only on the frame it went down (trigger=true). A positive repeat_ms
 	// re-fires a held key at that interval.
 	bool key(int code, bool trigger, float repeat_ms) const;
 private:
 	int tap_[256] = {};
+	int mouse_tap_ = 0;
+	bool override_ = false;
+	float last_x_ = 0, last_y_ = 0;
 };
 
 } // namespace omw

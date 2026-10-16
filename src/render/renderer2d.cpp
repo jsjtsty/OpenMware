@@ -117,6 +117,8 @@ Texture* Renderer2D::texture(const std::string& path) {
 		tex->gpu = gpu_->create_texture_rgba8(img.w, img.h, img.rgba.data());
 		tex->w = img.w;
 		tex->h = img.h;
+		tex->alpha.resize(static_cast<size_t>(img.w) * img.h);
+		for (size_t i = 0; i < tex->alpha.size(); i++) tex->alpha[i] = img.rgba[i * 4 + 3];
 	} else {
 		std::fprintf(stderr, "[texture] cannot load %s\n", path.c_str());
 	}

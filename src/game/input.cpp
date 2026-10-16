@@ -133,6 +133,14 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 			tap_[i] = 0;
 		}
 	}
+	if (mouse_tap_ == 2) {
+		mouse_down[0] = mouse_pressed[0] = true;
+		mouse_tap_ = 1;
+	} else if (mouse_tap_ == 1) {
+		mouse_down[0] = false;
+		mouse_released[0] = true;
+		mouse_tap_ = 0;
+	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		switch (e.type) {
@@ -177,6 +185,13 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 	float mx = 0, my = 0;
 	SDL_GetMouseState(&mx, &my);
 	if (window) SDL_GetWindowSize(window, &ww, &wh);
+	if (override_) { // scripted cursor: derive the movement from the last frame
+		mouse_dx = mouse_x - last_x_;
+		mouse_dy = mouse_y - last_y_;
+		last_x_ = mouse_x;
+		last_y_ = mouse_y;
+		return;
+	}
 	if (ww > 0 && wh > 0) {
 		const float scale = std::min(static_cast<float>(ww) / game_w, static_cast<float>(wh) / game_h);
 		const float ox = (ww - game_w * scale) * 0.5f, oy = (wh - game_h * scale) * 0.5f;

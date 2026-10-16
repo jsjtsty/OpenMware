@@ -87,6 +87,36 @@ void Stage::build_draw_list(std::vector<DrawItem>& out) const {
 	}
 }
 
+namespace {
+bool sprite_hit(const Sprite& s, float x, float y) {
+	if (s.width <= 0 || s.height <= 0 || s.scale.value[0] == 0 || s.scale.value[1] == 0) return false;
+	const float px = s.pivot_x * s.width, py = s.pivot_y * s.height;
+	const float cs = std::cos(s.rotate.value[2]), sn = std::sin(s.rotate.value[2]);
+	const float ox = x - s.move.value[0] - px, oy = y - s.move.value[1] - py;
+	const float dx = ox * cs + oy * sn, dy = -ox * sn + oy * cs; // inverse rotation
+	const float lx = dx / s.scale.value[0] + px, ly = dy / s.scale.value[1] + py;
+	if (lx < 0 || ly < 0 || lx >= s.width || ly >= s.height) return false;
+	if (s.check_alpha && s.texture && !s.texture->alpha.empty()) {
+		const float sw = s.sub_w > 0 ? static_cast<float>(s.sub_w) : static_cast<float>(s.texture->w - s.sub_x);
+		const float sh = s.sub_h > 0 ? static_cast<float>(s.sub_h) : static_cast<float>(s.texture->h - s.sub_y);
+		const int tx = std::clamp(s.sub_x + static_cast<int>(lx * sw / s.width), 0, s.texture->w - 1);
+		const int ty = std::clamp(s.sub_y + static_cast<int>(ly * sh / s.height), 0, s.texture->h - 1);
+		return s.texture->alpha[static_cast<size_t>(ty) * s.texture->w + tx] > 0;
+	}
+	return true;
+}
+} // namespace
+
+void Stage::update_pointer(float x, float y) {
+	prev_hot_ = hot_;
+	hot_ = nullptr;
+	for (const auto& sp : sprites_) {
+		const Sprite* s = sp.get();
+		if (!s->clickable || s->released || !sprite_hit(*s, x, y)) continue;
+		if (!hot_ || s->priority > hot_->priority || (s->priority == hot_->priority && s->order > hot_->order)) hot_ = s;
+	}
+}
+
 void Stage::dump() const {
 	for (const auto& s : sprites_)
 		std::printf("  sprite %-28s kind=%d prio=%d fade=%.2f pos=(%.0f,%.0f) size=%.0fx%.0f scale=(%.2f,%.2f) tex=%d erase=%d\n", s->name.c_str(),

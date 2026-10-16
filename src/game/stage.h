@@ -39,6 +39,7 @@ struct Sprite {
 	Anim<1> fade{1.f};
 	std::array<Anim<3>, 4> color; // per-corner RGB (0..255)
 	Anim<2> scroll{0.f};
+	bool clickable = false, check_alpha = false; // SetClickable: takes part in mouse hit testing
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
 	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)
@@ -66,12 +67,18 @@ public:
 	void update(float dt_ms);
 	// Visible sprites back-to-front as quads.
 	void build_draw_list(std::vector<DrawItem>& out) const;
+	// Finds the clickable sprite under the cursor (topmost wins); call once per frame before the script runs.
+	void update_pointer(float x, float y);
+	const Sprite* hot() const { return hot_; }
+	const Sprite* previous_hot() const { return prev_hot_; }
 	size_t size() const { return sprites_.size(); }
 	void dump() const; // one line per sprite on stdout (debugging)
 
 private:
 	std::vector<std::shared_ptr<Sprite>> sprites_;
 	uint64_t next_order_ = 0;
+	const Sprite* hot_ = nullptr;
+	const Sprite* prev_hot_ = nullptr;
 };
 
 } // namespace omw

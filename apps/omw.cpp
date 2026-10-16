@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
 	bool trace = false;
 	std::string shot;
 	std::vector<std::pair<int, std::string>> evals; // --eval FRAME:CODE (run a script snippet at a frame)
+	struct MouseCmd { int frame; float x, y; bool click; };
+	std::vector<MouseCmd> mouse_cmds; // --mouse FRAME:X:Y[:click]
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
 		const std::string a = argv[i];
@@ -38,6 +40,12 @@ int main(int argc, char** argv) {
 		else if (a == "--eval" && i + 1 < argc) {
 			const std::string spec = argv[++i];
 			evals.emplace_back(std::atoi(spec.c_str()), spec.substr(spec.find(':') + 1));
+		}
+		else if (a == "--mouse" && i + 1 < argc) {
+			MouseCmd c{0, 0, 0, false};
+			const std::string spec = argv[++i];
+			c.click = spec.find("click") != std::string::npos;
+			if (std::sscanf(spec.c_str(), "%d:%f:%f", &c.frame, &c.x, &c.y) == 3) mouse_cmds.push_back(c);
 		}
 		else if (a == "--press" && i + 1 < argc) {
 			int f = 0, k = 0;
@@ -87,8 +95,14 @@ int main(int argc, char** argv) {
 			if (f == frame) input.tap_key(k);
 		for (const auto& [f, code] : evals)
 			if (f == frame) host.debug_eval(code.c_str());
+		for (const auto& c : mouse_cmds)
+			if (c.frame == frame) {
+				input.set_cursor(c.x, c.y);
+				if (c.click) input.tap_mouse();
+			}
 		input.poll(gpu.window, Stage::kWidth, Stage::kHeight, 1000.f / 60.f);
 		if (input.quit) running = false;
+		stage.update_pointer(input.mouse_x, input.mouse_y);
 		if (!host.resume_frame(&err)) {
 			std::fprintf(stderr, "script error at frame %d: %s\n", frame, err.c_str());
 			break;

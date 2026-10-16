@@ -1,6 +1,7 @@
 // SQSprite: script-visible 2D sprites on the Stage. The property animations (move/scale/rotate/fade/colour) follow the
 // original's "target value, time in ms, tempo curve" model; details that are not yet verified against the original are
 // marked TODO and tracked in docs/script-notes.md.
+#include "game/input.h"
 #include "game/stage.h"
 #include "render/renderer2d.h"
 #include "script/bind.h"
@@ -220,6 +221,31 @@ void register_sprite_property_methods(ScriptHost& h) {
 	h.add_method("isRotating", is_rotating);
 }
 
+SQInteger set_clickable(HSQUIRRELVM v) { // (clickable, check_alpha)
+	spr(v)->clickable = arg_int(v, 2) != 0;
+	spr(v)->check_alpha = arg_int(v, 3) != 0;
+	TRACE_SPRITE("[f%d] [sprite %s] clickable %d alpha %d\n", host().frame, spr(v)->name.c_str(), static_cast<int>(arg_int(v, 2)), static_cast<int>(arg_int(v, 3)));
+	return 0;
+}
+// Mouse queries: the stage resolves the topmost clickable sprite under the cursor once per frame.
+bool is_hot(HSQUIRRELVM v) { return host().stage && host().stage->hot() == spr(v); }
+SQInteger is_over(HSQUIRRELVM v) { // (trigger): trigger != 0 -> only on the frame the cursor enters
+	bool on = is_hot(v);
+	if (on && arg_int(v, 2) != 0) on = host().stage->previous_hot() != spr(v);
+	sq_pushbool(v, on);
+	return 1;
+}
+SQInteger is_down(HSQUIRRELVM v) { // (trigger): left button pressed over the sprite (trigger: only the press frame)
+	const int st = host().input ? host().input->mouse_state(0) : 0;
+	sq_pushbool(v, is_hot(v) && (st == MOUSE_DOWN || (arg_int(v, 2) == 0 && st == MOUSE_HOLD)));
+	return 1;
+}
+SQInteger is_up(HSQUIRRELVM v) { // left button released over the sprite
+	sq_pushbool(v, is_hot(v) && host().input && host().input->mouse_state(0) == MOUSE_UP);
+	return 1;
+}
+SQInteger ret_null(HSQUIRRELVM) { return 0; }
+
 void register_sprite_class(ScriptHost& h) {
 	h.begin_class("SQSprite");
 	h.add_method("constructor", ctor);
@@ -229,6 +255,11 @@ void register_sprite_class(ScriptHost& h) {
 	h.add_method("createScreen", create_screen);
 	register_sprite_property_methods(h);
 	register_movie_methods(h);
+	h.add_method("setClickable", set_clickable);
+	h.add_method("isOver", is_over);
+	h.add_method("isDown", is_down);
+	h.add_method("isUp", is_up);
+	h.add_method("setChangeCursor", ret_null);
 	h.add_method("scroll", scroll);
 	h.add_method("getScroll", get_scroll);
 	h.add_method("getSize", get_size);
