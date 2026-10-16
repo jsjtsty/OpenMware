@@ -88,9 +88,10 @@ add_dependencies(gpu_demo omw_shaders)
 
 # --- Script runtime -----------------------------------------------------------------------------
 add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp
-	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp src/script/natives_text.cpp src/script/natives_sound.cpp src/script/natives_movie.cpp)
+	src/script/natives_globals.cpp src/script/natives_app.cpp src/script/natives_sprite.cpp src/script/natives_file.cpp src/script/natives_text.cpp src/script/natives_sound.cpp src/script/natives_movie.cpp src/script/vm_snapshot.cpp)
 target_include_directories(omw_script PUBLIC src)
 target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render omw_audio omw_video squirrel2::squirrel2)
+target_include_directories(omw_script PRIVATE third_party/squirrel2/squirrel) # vm_snapshot.cpp walks the VM's internals
 
 add_executable(scriptrun apps/scriptrun.cpp)
 target_link_libraries(scriptrun PRIVATE omw_script)

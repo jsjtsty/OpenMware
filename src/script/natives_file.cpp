@@ -10,10 +10,6 @@
 #include <fstream>
 
 namespace omw {
-namespace {
-
-using sqb::arg_int;
-using sqb::arg_string;
 
 struct FileObj {
 	std::vector<uint8_t> data; // whole file for reading
@@ -30,6 +26,29 @@ struct FileObj {
 		open = false;
 	}
 };
+
+// Raw access for the VM snapshot code (it shares the stream with the script callbacks).
+bool file_obj_write(FileObj* f, const void* p, size_t n) { return f && f->out && std::fwrite(p, 1, n, f->out) == n; }
+bool file_obj_read(FileObj* f, void* p, size_t n) {
+	if (!f || f->pos + n > f->data.size()) return false;
+	std::memcpy(p, f->data.data() + f->pos, n);
+	f->pos += n;
+	return true;
+}
+long file_obj_tell(FileObj* f) { return !f ? -1 : f->out ? std::ftell(f->out) : static_cast<long>(f->pos); }
+bool file_obj_seek(FileObj* f, long pos) {
+	if (!f) return false;
+	if (f->out) return std::fseek(f->out, pos, SEEK_SET) == 0;
+	if (pos < 0 || static_cast<size_t>(pos) > f->data.size()) return false;
+	f->pos = static_cast<size_t>(pos);
+	return true;
+}
+bool file_obj_seek_end(FileObj* f) { return f && f->out && std::fseek(f->out, 0, SEEK_END) == 0; }
+
+namespace {
+
+using sqb::arg_int;
+using sqb::arg_string;
 
 #define FILE_OBJ sqb::self<FileObj>(v)
 

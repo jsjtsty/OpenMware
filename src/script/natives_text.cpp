@@ -273,6 +273,15 @@ SQInteger get_remain_time(HSQUIRRELVM v) {
 	sq_pushfloat(v, t->typing ? std::max(0.f, t->typing_total - t->typing_elapsed) : 0.f);
 	return 1;
 }
+SQInteger get_typing_timer(HSQUIRRELVM v) { TextRef* t = txt(v); sq_pushfloat(v, t->typing ? t->typing_elapsed : 0.f); return 1; }
+SQInteger set_typing_timer(HSQUIRRELVM v) {
+	TextRef* t = txt(v);
+	if (t->typing) {
+		t->typing_elapsed = std::min(std::max(0.f, arg_float(v, 2)), t->typing_total);
+		t->refresh();
+	}
+	return 0;
+}
 SQInteger ret_zero(HSQUIRRELVM v) { sq_pushinteger(v, 0); return 1; }
 SQInteger ret_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
 
@@ -316,6 +325,8 @@ void register_text_class(ScriptHost& h) {
 	h.add_method("setTypingThreshold", ret_null);
 	h.add_method("getTotalTime", get_total_time);
 	h.add_method("getDurationTime", get_total_time);
+	h.add_method("getTypingTimer", get_typing_timer);
+	h.add_method("setTypingTimer", set_typing_timer);
 	h.add_method("getRemainTime", get_remain_time);
 	h.add_method("setLock", ret_null);
 	h.add_method("setDisused", ret_null);

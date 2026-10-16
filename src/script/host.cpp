@@ -1,4 +1,5 @@
 #include "script/host.h"
+#include "script/vm_snapshot.h"
 
 #include <sqstdmath.h>
 #include <sqstdstring.h>
@@ -129,6 +130,21 @@ SQInteger native_stub(HSQUIRRELVM v) {
 	} else if (count == 1) {
 		h->log.push_back(std::string("[stub] ") + name);
 	}
+	// Native objects keep no state of their own in a save file (the scripts rebuild them), but the script checks that
+	// serialize()/deserialize() report success.
+	const std::string n = name;
+	if (n.size() > 10 && (n.compare(n.size() - 10, 10, ".serialize") == 0 || (n.size() > 12 && n.compare(n.size() - 12, 12, ".deserialize") == 0))) {
+		sq_pushbool(v, SQTrue);
+		return 1;
+	}
+	// Saving reads every animation timer back; an unimplemented effect has none running.
+	const size_t dot = n.find_last_of('.');
+	const std::string method = dot == std::string::npos ? n : n.substr(dot + 1);
+	auto ends = [&](const char* suffix) { const size_t l = std::strlen(suffix); return method.size() > l && method.compare(method.size() - l, l, suffix) == 0; };
+	if (method.rfind("get", 0) == 0 && (ends("Timer") || ends("Phase"))) {
+		sq_pushfloat(v, 0.f);
+		return 1;
+	}
 	return 0;
 }
 
@@ -210,8 +226,8 @@ ScriptHost::ScriptHost(NpkArchive& scripts) : scripts_(scripts) {
 	register_natives();
 	register_global_natives(*this);
 	register_real_classes(*this);
+	register_snapshot_natives(*this);
 	for (const char* name : {"PreCompile", "Suspend", "TokenizeText", "ConvertToUTF16", "CompareSqObject",
-							 "CreateReferenceTable", "ClearReferenceTable", "SerializeRootTable", "DeserializeRootTable",
 							 "ResetNGCode", "AddNGCode_HeadOfLine", "AddNGCode_EndOfLine"}) {
 		sq_pushroottable(vm_);
 		sq_pushstring(vm_, name, -1);

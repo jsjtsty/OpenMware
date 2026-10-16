@@ -131,6 +131,7 @@ SQInteger target_play(HSQUIRRELVM v) { spr(v)->capturing = true; return 0; }
 SQInteger target_stop(HSQUIRRELVM v) { spr(v)->capturing = false; return 0; }
 SQInteger target_is_capture(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->is_capture && spr(v)->capturing); return 1; }
 SQInteger target_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
+SQInteger target_true(HSQUIRRELVM v) { sq_pushbool(v, SQTrue); return 1; }
 SQInteger target_noop(HSQUIRRELVM) { return 0; }
 
 SQInteger set_surface(HSQUIRRELVM v) { // (target sprite name; "null"/empty: the screen)
@@ -364,6 +365,18 @@ template <auto M> SQInteger anim_get_timer(HSQUIRRELVM v) {
 	sq_pushfloat(v, a.active ? a.timer : 0.f);
 	return 1;
 }
+// Per-corner colour animations (index 0..3).
+SQInteger set_color_timer(HSQUIRRELVM v) {
+	const SQInteger i = arg_int(v, 2);
+	if (i >= 0 && i < 4) spr(v)->color[static_cast<size_t>(i)].set_timer(arg_float(v, 3));
+	return 0;
+}
+SQInteger get_color_timer(HSQUIRRELVM v) {
+	const SQInteger i = arg_int(v, 2);
+	const auto& a = spr(v)->color[static_cast<size_t>(i < 0 || i > 3 ? 0 : i)];
+	sq_pushfloat(v, a.active ? a.timer : 0.f);
+	return 1;
+}
 SQInteger is_shaking(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->shake.active); return 1; }
 // Vector3D argument (instance with x / y members) -> x, y.
 void vec_xy(HSQUIRRELVM v, SQInteger idx, float out[2]) {
@@ -421,6 +434,8 @@ static void register_effect_methods(ScriptHost& h) {
 	h.add_method("getRotateTimer", anim_get_timer<&Sprite::rotate>);
 	h.add_method("setScrollTimer", anim_set_timer<&Sprite::scroll>);
 	h.add_method("getScrollTimer", anim_get_timer<&Sprite::scroll>);
+	h.add_method("setColorTimer", set_color_timer);
+	h.add_method("getColorTimer", get_color_timer);
 	h.add_method("isShaking", is_shaking);
 	h.add_method("shake", shake<false>);
 	h.add_method("randomShake", shake<true>);
@@ -490,8 +505,10 @@ static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool 
 		h.add_method("stop", target_stop);
 		h.add_method("isCaptureEnabled", target_is_capture);
 		h.add_method("isDelayedRendering", target_false);
+		h.add_method("serialize", target_true); // save files keep no native state: the scripts rebuild the surface
+		h.add_method("deserialize", target_true);
 		for (const char* n : {"setDelayRendering", "setCaptureTarget", "setCopyTarget", "createCustomEffect", "setCustomEffectParameter",
-							  "saveImage", "clear", "serialize", "deserialize", "setBlurMode", "setTextureFiltering"})
+							  "saveImage", "clear", "setBlurMode", "setTextureFiltering"})
 			h.add_method(n, target_noop);
 	} else {
 		h.add_method("create", create);
