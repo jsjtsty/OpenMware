@@ -364,7 +364,51 @@ template <auto M> SQInteger anim_get_timer(HSQUIRRELVM v) {
 	sq_pushfloat(v, a.active ? a.timer : 0.f);
 	return 1;
 }
-SQInteger is_shaking(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
+SQInteger is_shaking(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->shake.active); return 1; }
+// Vector3D argument (instance with x / y members) -> x, y.
+void vec_xy(HSQUIRRELVM v, SQInteger idx, float out[2]) {
+	out[0] = out[1] = 0.f;
+	const char* keys[2] = {"x", "y"};
+	for (int i = 0; i < 2; i++) {
+		sq_push(v, idx);
+		sq_pushstring(v, keys[i], -1);
+		if (SQ_SUCCEEDED(sq_get(v, -2))) {
+			SQFloat f = 0;
+			if (SQ_FAILED(sq_getfloat(v, -1, &f))) { SQInteger n = 0; sq_getinteger(v, -1, &n); f = static_cast<SQFloat>(n); }
+			out[i] = static_cast<float>(f);
+			sq_pop(v, 1);
+		}
+		sq_pop(v, 1);
+	}
+}
+template <bool Random> SQInteger shake(HSQUIRRELVM v) { // (start vec, end vec, frequency ms, interpolation, time ms, tempo, beattempo)
+	float a[2], b[2];
+	vec_xy(v, 2, a);
+	vec_xy(v, 3, b);
+	spr(v)->shake.start(a[0], a[1], b[0], b[1], arg_float(v, 4), arg_float(v, 6), Random);
+	return 0;
+}
+SQInteger get_shake_timer(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->shake.active ? spr(v)->shake.time - spr(v)->shake.timer : 0.f); return 1; }
+SQInteger set_shake_timer(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	if (s->shake.active) { s->shake.timer = 0; s->shake.update(arg_float(v, 2)); }
+	return 0;
+}
+// Vector3D: plain x / y / z members.
+SQInteger vec3_ctor(HSQUIRRELVM v) {
+	static const char* keys[3] = {"x", "y", "z"};
+	const SQInteger n = sq_gettop(v);
+	for (int i = 0; i < 3; i++) {
+		SQFloat f = 0;
+		if (n >= 2 + i && SQ_FAILED(sq_getfloat(v, 2 + i, &f))) { SQInteger k = 0; sq_getinteger(v, 2 + i, &k); f = static_cast<SQFloat>(k); }
+		sq_push(v, 1);
+		sq_pushstring(v, keys[i], -1);
+		sq_pushfloat(v, f);
+		sq_set(v, -3);
+		sq_pop(v, 1);
+	}
+	return 0;
+}
 
 static void register_effect_methods(ScriptHost& h) {
 	h.add_method("setFadeTimer", anim_set_timer<&Sprite::fade>);
@@ -378,6 +422,10 @@ static void register_effect_methods(ScriptHost& h) {
 	h.add_method("setScrollTimer", anim_set_timer<&Sprite::scroll>);
 	h.add_method("getScrollTimer", anim_get_timer<&Sprite::scroll>);
 	h.add_method("isShaking", is_shaking);
+	h.add_method("shake", shake<false>);
+	h.add_method("randomShake", shake<true>);
+	h.add_method("getShakeTimer", get_shake_timer);
+	h.add_method("setShakeTimer", set_shake_timer);
 	h.add_method("setActionCompatibleMode", ret_null);
 	h.add_method("setColorHue", fx_set<&Sprite::Effects::hue>);
 	h.add_method("getColorHue", fx_get<&Sprite::Effects::hue>);
@@ -412,6 +460,14 @@ static void register_effect_methods(ScriptHost& h) {
 
 static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool render_target = false);
 void register_sprite_class(ScriptHost& h) {
+	h.begin_class("Vector3D");
+	for (const char* k : {"x", "y", "z"}) { // members must exist as class slots for scripts to assign them
+		sq_pushstring(h.vm(), k, -1);
+		sq_pushfloat(h.vm(), 0.f);
+		sq_newslot(h.vm(), -3, SQFalse);
+	}
+	h.add_method("constructor", vec3_ctor);
+	h.end_class();
 	h.begin_class("SQSprite");
 	register_sprite_members(h, ctor);
 	h.end_class();

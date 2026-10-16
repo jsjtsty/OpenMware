@@ -39,6 +39,16 @@ struct Sprite {
 	Anim<1> fade{1.f};
 	std::array<Anim<3>, 4> color; // per-corner RGB (0..255)
 	Anim<2> scroll{0.f};
+	// Shake: an offset that flips sign every `freq` ms (random: a new random offset), its amplitude going from `from` to `to` over `time`.
+	struct Shake {
+		bool active = false, random = false;
+		float from[2] = {0, 0}, to[2] = {0, 0};
+		float freq = 17, time = 0, timer = 0;
+		float off[2] = {0, 0};
+		uint32_t seed = 1;
+		void start(float fx, float fy, float tx, float ty, float freq_ms, float time_ms, bool rnd);
+		void update(float dt_ms);
+	} shake;
 	bool is_mask = false;   // SQSpriteMask: never drawn itself, only as the mask of other sprites
 	std::weak_ptr<Sprite> mask;           // SetMask: sprite whose picture multiplies this one (screen space)
 	std::weak_ptr<Sprite> displacement;   // SetDisplacementMap

@@ -67,6 +67,10 @@ void AudioEngine::update(float dt_ms) {
 			v.vol.update(dt_ms);
 			v.pan.update(dt_ms);
 			v.freq.update(dt_ms);
+			if (v.disused && v.playing && !v.vol.active && v.vol.value[0] <= 0.f) { // faded out: the sound is over
+				v.playing = v.paused = false;
+				v.pos = v.start_pos;
+			}
 			if (!v.playing && !v.paused) v.pcm.reset(); // idle voices give their samples back; play() reloads them
 		}
 	}
@@ -221,6 +225,10 @@ void AudioEngine::set_frequency(int id, float val, float time_ms, int tempo) {
 void AudioEngine::set_time_scale(int id, float scale) {
 	std::lock_guard lock(mutex_);
 	if (Voice* v = find(id)) v->time_scale = scale;
+}
+void AudioEngine::set_disused(int id, bool on) {
+	std::lock_guard lock(mutex_);
+	if (Voice* v = find(id)) v->disused = on;
 }
 void AudioEngine::set_type(int id, int type) {
 	std::lock_guard lock(mutex_);

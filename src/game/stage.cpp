@@ -12,6 +12,38 @@
 
 namespace omw {
 
+void Sprite::Shake::start(float fx, float fy, float tx, float ty, float freq_ms, float time_ms, bool rnd) {
+	from[0] = fx; from[1] = fy; to[0] = tx; to[1] = ty;
+	freq = freq_ms > 0 ? freq_ms : 17.f;
+	time = time_ms;
+	timer = 0;
+	random = rnd;
+	active = time_ms > 0;
+	off[0] = off[1] = 0;
+	if (active) update(0);
+}
+
+void Sprite::Shake::update(float dt_ms) {
+	if (!active) return;
+	timer += dt_ms;
+	if (timer >= time) {
+		active = false;
+		off[0] = off[1] = 0;
+		return;
+	}
+	const float k = timer / time;
+	const int step = static_cast<int>(timer / freq);
+	for (int i = 0; i < 2; i++) {
+		const float amp = from[i] + (to[i] - from[i]) * k;
+		float sign = (step & 1) ? -1.f : 1.f;
+		if (random) {
+			seed = seed * 1664525u + 1013904223u + static_cast<uint32_t>(step) * 2654435761u + i;
+			sign = static_cast<float>((seed >> 8) & 0xFFFF) / 32767.5f - 1.f;
+		}
+		off[i] = amp * sign;
+	}
+}
+
 Sprite::Sprite() {
 	for (auto& c : color) c.set({255.f, 255.f, 255.f});
 }
@@ -24,6 +56,7 @@ void Sprite::update(float dt_ms) {
 	rotate.update(dt);
 	fade.update(dt);
 	scroll.update(dt);
+	shake.update(dt);
 	trans.update(dt);
 	for (auto& c : color) c.update(dt);
 	fx.update(dt);
@@ -58,8 +91,8 @@ DrawQuad make_quad(const Sprite* s) {
 	const float lx[4] = {0, w, w, 0}, ly[4] = {0, 0, h, h};
 	for (int i = 0; i < 4; i++) {
 		const float dx = (lx[i] - px) * s->scale.value[0], dy = (ly[i] - py) * s->scale.value[1];
-		d.x[i] = s->move.value[0] + px + dx * cs - dy * sn;
-		d.y[i] = s->move.value[1] + py + dx * sn + dy * cs;
+		d.x[i] = s->move.value[0] + s->shake.off[0] + px + dx * cs - dy * sn;
+		d.y[i] = s->move.value[1] + s->shake.off[1] + py + dx * sn + dy * cs;
 		d.r[i] = s->color[i].value[0] / 255.f;
 		d.g[i] = s->color[i].value[1] / 255.f;
 		d.b[i] = s->color[i].value[2] / 255.f;

@@ -115,6 +115,7 @@ VOICE_CALL(set_volume, a.set_volume(id, arg_float(v, 2), arg_float(v, 3), static
 VOICE_CALL(set_pan, a.set_pan(id, arg_float(v, 2), arg_float(v, 3), static_cast<int>(arg_int(v, 4))))
 VOICE_CALL(set_frequency, a.set_frequency(id, arg_float(v, 2), arg_float(v, 3), static_cast<int>(arg_int(v, 4))))
 VOICE_CALL(set_time_scale, a.set_time_scale(id, arg_float(v, 2, 1.f)))
+VOICE_CALL(set_disused, a.set_disused(id, arg_int(v, 2, 1) != 0))
 VOICE_CALL(set_type, a.set_type(id, static_cast<int>(arg_int(v, 2))))
 
 template <class F>
@@ -158,6 +159,7 @@ void register_sound_class(ScriptHost& h) {
 	h.add_method("setFrequency", set_frequency);
 	h.add_method("setTimeScale", set_time_scale);
 	h.add_method("setType", set_type);
+	h.add_method("setDisused", set_disused);
 	h.add_method("isPlaying", is_playing);
 	h.add_method("isPaused", is_paused);
 	h.add_method("getVolume", get_volume);
@@ -169,7 +171,7 @@ void register_sound_class(ScriptHost& h) {
 	for (const char* n : {"getVolumeTimer", "getPanTimer", "getFrequencyTimer", "getPulse", "getAmplitude"}) h.add_method(n, ret_zero_f);
 	for (const char* n : {"getLock", "getDisused"}) h.add_method(n, ret_false);
 	// Timers, effects and grouping are accepted without effect for now (echo/reverb, group priorities, fade-time control).
-	for (const char* n : {"setLock", "setDisused", "setVolumeTimer", "setPanTimer", "setFrequencyTimer", "setEcho", "setPresetReverb",
+	for (const char* n : {"setLock", "setVolumeTimer", "setPanTimer", "setFrequencyTimer", "setEcho", "setPresetReverb",
 						  "addSoundGroup", "setVolumeControlFadeTime"})
 		h.add_method(n, ret_null);
 	h.end_class();

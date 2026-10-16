@@ -50,6 +50,8 @@ public:
 	void set_frequency(int id, float v, float time_ms, int tempo);
 	void set_time_scale(int id, float scale);
 	void set_type(int id, int type);
+	// A disused voice is released by the game once it ends or is faded out: silence (volume 0, no fade running) stops it.
+	void set_disused(int id, bool on);
 	void set_type_volume(int type, float v, float time_ms, int tempo);
 
 	bool is_playing(int id);
@@ -74,6 +76,7 @@ private:
 		Anim<1> vol{1.f}, pan{0.f}, freq{1.f};
 		float time_scale = 1.f;
 		int type = -1;
+		bool disused = false;
 		float last_gain = 1.f;
 	};
 	Voice* find(int id);
