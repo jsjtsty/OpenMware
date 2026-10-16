@@ -69,3 +69,11 @@ then calls the generic primitive draw `FUN_100211a0(this, topology=2, ...)` and 
 - D3D12 gotcha: a pixel shader must read every output of the vertex shader (color, uv, projective) or the pipeline cannot be created
   (E_INVALIDARG): the dropped TEXCOORD2 shifts the packed input registers. fx.hlsl reads all of them with two always-true clip() calls.
   Fragment uniform buffers were never tried; effect parameters go through a 4x1 float texture instead.
+
+## Supersampled frame
+
+The game frame (and the temporary effect textures and capture sprites that belong to it) is rendered at `ss_` x the logical
+1024x576 (default 2, `OMW_SS=1..4` overrides) and scaled to the window by the final blit. Vertex coordinates stay logical, so only
+texture sizes change: `RenderPass::hi` marks passes that live at frame resolution. Text bitmaps are rasterized at the same factor
+(`rasterize_text(..., scale)`) while the sprite keeps its logical size. Surfaces (`SQSpriteRenderTarget`) stay at 1x; a capture
+sprite drawn inside a surface pass would mismatch (not seen in the game). Screenshots (`--shot`) are therefore 2048x1152.

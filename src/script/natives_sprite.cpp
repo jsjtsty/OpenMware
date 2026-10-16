@@ -114,7 +114,7 @@ SQInteger target_create(HSQUIRRELVM v) {
 	s->is_capture = arg_int(v, 4, 0) != 0;
 	s->is_target = !s->is_capture;
 	s->capturing = true;
-	s->texture = host().renderer ? host().renderer->create_target(w, h) : nullptr;
+	s->texture = host().renderer ? host().renderer->create_target(w * (s->is_capture ? host().renderer->supersample() : 1), h * (s->is_capture ? host().renderer->supersample() : 1)) : nullptr; // a capture copies from the supersampled frame
 	if (!s->texture) {
 		sq_pushinteger(v, -1);
 		return 1;

@@ -224,17 +224,17 @@ void over(uint8_t* px, const float rgb[3], float a) {
 	px[3] = static_cast<uint8_t>(std::clamp(oa, 0.f, 1.f) * 255.f + 0.5f);
 }
 
-void draw_glyph(const LaidGlyph& g, float ox, float oy, const float rgb[3], float alpha, int w, int h, std::vector<uint8_t>& rgba) {
+void draw_glyph(const LaidGlyph& g, float ox, float oy, const float rgb[3], float alpha, int w, int h, float k, std::vector<uint8_t>& rgba) {
 	if (!g.face || !g.face->ok) return;
-	const float scale = stbtt_ScaleForMappingEmToPixels(&g.face->info, g.size);
+	const float scale = stbtt_ScaleForMappingEmToPixels(&g.face->info, g.size * k);
 	int x0, y0, x1, y1;
 	stbtt_GetCodepointBitmapBox(&g.face->info, static_cast<int>(g.cp), scale, scale, &x0, &y0, &x1, &y1);
 	const int gw = x1 - x0, gh = y1 - y0;
 	if (gw <= 0 || gh <= 0) return;
 	std::vector<uint8_t> cov(static_cast<size_t>(gw) * gh);
 	stbtt_MakeCodepointBitmap(&g.face->info, cov.data(), gw, gh, gw, scale, scale, static_cast<int>(g.cp));
-	const int px0 = static_cast<int>(std::floor(g.x + ox)) + x0;
-	const int py0 = static_cast<int>(std::floor(g.baseline + oy)) + y0;
+	const int px0 = static_cast<int>(std::floor((g.x + ox) * k)) + x0;
+	const int py0 = static_cast<int>(std::floor((g.baseline + oy) * k)) + y0;
 	for (int y = 0; y < gh; y++) {
 		const int py = py0 + y;
 		if (py < 0 || py >= h) continue;
@@ -249,7 +249,7 @@ void draw_glyph(const LaidGlyph& g, float ox, float oy, const float rgb[3], floa
 
 } // namespace
 
-void rasterize_text(const TextLayout& layout, const TextStyle& st, int visible, int w, int h, std::vector<uint8_t>& rgba) {
+void rasterize_text(const TextLayout& layout, const TextStyle& st, int visible, int w, int h, std::vector<uint8_t>& rgba, float k) {
 	rgba.assign(static_cast<size_t>(w) * h * 4, 0);
 	auto shown = [&](const LaidGlyph& g) { return g.ruby ? g.base_first < visible : g.index < visible; };
 	if (st.shadow_type != 0 && st.shadow_gap > 0) {
@@ -257,11 +257,11 @@ void rasterize_text(const TextLayout& layout, const TextStyle& st, int visible, 
 		static const float dirs[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {0.7f, 0.7f}, {-0.7f, 0.7f}, {0.7f, -0.7f}, {-0.7f, -0.7f}};
 		for (const LaidGlyph& g : layout.glyphs) {
 			if (!shown(g)) continue;
-			for (const auto& d : dirs) draw_glyph(g, d[0] * gap, d[1] * gap, st.shadow_color, st.shadow_power * 0.5f, w, h, rgba);
+			for (const auto& d : dirs) draw_glyph(g, d[0] * gap, d[1] * gap, st.shadow_color, st.shadow_power * 0.5f, w, h, k, rgba);
 		}
 	}
 	for (const LaidGlyph& g : layout.glyphs)
-		if (shown(g)) draw_glyph(g, 0, 0, st.color, 1.f, w, h, rgba);
+		if (shown(g)) draw_glyph(g, 0, 0, st.color, 1.f, w, h, k, rgba);
 }
 
 } // namespace omw

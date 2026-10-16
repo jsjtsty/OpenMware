@@ -29,6 +29,7 @@ public:
 	void replace_dynamic_texture(Texture* t, int w, int h, const uint8_t* rgba);
 	void destroy_dynamic_texture(Texture* t);
 	FontLibrary& fonts() { return fonts_; }
+	int supersample() const { return ss_; }
 	// Offscreen surface the stage draws sprites into (SQSpriteRenderTarget); freed with destroy_dynamic_texture.
 	Texture* create_target(int w, int h);
 
@@ -65,6 +66,7 @@ private:
 	std::vector<SDL_GPUTexture*> fx_params_;           // per effect pass of a frame: 4x1 float texture of its parameters
 	SDL_GPUTransferBuffer* ptransfer_ = nullptr;
 	size_t ptransfer_capacity_ = 0;
+	int ss_ = 2; // the game frame is rendered at ss_ x the logical 1024x576 and scaled down to the window
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
 	std::map<std::pair<int, int>, Scratch> scratch_;
 	std::vector<Texture*> temps_;                      // temporary textures of the effect chains, by slot

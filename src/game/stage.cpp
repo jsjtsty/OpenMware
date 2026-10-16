@@ -150,6 +150,7 @@ void Stage::build_draw_list(DrawList& out) const {
 			int cur = a;
 			RenderPass draw;
 			draw.temp_target = a;
+			draw.hi = !target;
 			draw.w = w;
 			draw.h = h;
 			DrawItem single = e.item;
@@ -161,6 +162,7 @@ void Stage::build_draw_list(DrawList& out) const {
 				RenderPass p;
 				p.op = op;
 				p.in_temp = in;
+				p.hi = !target;
 				p.temp_target = dst;
 				p.w = w;
 				p.h = h;
@@ -215,6 +217,7 @@ void Stage::build_draw_list(DrawList& out) const {
 		for (auto& e : list)
 			for (auto& p : e.pre) out.push_back(std::move(p));
 		RenderPass pass;
+		pass.hi = !target;
 		if (target) {
 			pass.target = target->texture;
 			pass.w = target->texture->w;

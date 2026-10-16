@@ -111,6 +111,7 @@ struct RenderPass {
 	int temp_target = -1;
 	int in_temp = -1;
 	int w = 0, h = 0;
+	bool hi = false; // part of the game frame: rendered at the renderer's supersampled resolution
 	std::vector<DrawItem> items;
 	// Blur: p[0..1] = step in UV, p[2] = sigma in texels.  Color: p[0..3] hue/saturation/value/glow, p[4..6] sepia/nega/mono,
 	// p[8..9] mono cb/cr.

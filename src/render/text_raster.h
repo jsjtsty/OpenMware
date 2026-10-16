@@ -67,6 +67,6 @@ struct TextLayout {
 TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& style);
 
 // Draws the first `visible` characters (and the ruby over them) into an RGBA bitmap of w x h.
-void rasterize_text(const TextLayout& layout, const TextStyle& style, int visible, int w, int h, std::vector<uint8_t>& rgba);
+void rasterize_text(const TextLayout& layout, const TextStyle& style, int visible, int w, int h, std::vector<uint8_t>& rgba, float scale = 1.f);
 
 } // namespace omw

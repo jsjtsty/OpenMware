@@ -80,10 +80,11 @@ struct TextRef : SpriteRef {
 		shown = vis;
 		bmp_w = std::max(1, style.field_w > 0 ? style.field_w : static_cast<int>(std::ceil(layout.width)) + 1);
 		bmp_h = std::max(1, std::max(style.field_h, static_cast<int>(std::ceil(layout.height))));
+		const int ss = r->supersample(); // the bitmap carries ss x the logical resolution; the sprite keeps the logical size
 		std::vector<uint8_t> px;
-		rasterize_text(layout, style, vis, bmp_w, bmp_h, px);
-		if (!tex) tex = r->create_dynamic_texture(bmp_w, bmp_h, px.data());
-		else r->replace_dynamic_texture(tex, bmp_w, bmp_h, px.data());
+		rasterize_text(layout, style, vis, bmp_w * ss, bmp_h * ss, px, static_cast<float>(ss));
+		if (!tex) tex = r->create_dynamic_texture(bmp_w * ss, bmp_h * ss, px.data());
+		else r->replace_dynamic_texture(tex, bmp_w * ss, bmp_h * ss, px.data());
 		if (sprite) {
 			sprite->kind = Sprite::Kind::Image;
 			sprite->texture = tex;

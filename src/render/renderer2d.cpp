@@ -78,12 +78,13 @@ bool Renderer2D::init(GpuContext& gpu, const GameFiles& files, std::string* erro
 	ti.type = SDL_GPU_TEXTURETYPE_2D;
 	ti.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
 	ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
-	ti.width = Stage::kWidth;
-	ti.height = Stage::kHeight;
+	if (const char* e = std::getenv("OMW_SS")) ss_ = std::clamp(std::atoi(e), 1, 4);
+	ti.width = Stage::kWidth * ss_;
+	ti.height = Stage::kHeight * ss_;
 	ti.layer_count_or_depth = 1;
 	ti.num_levels = 1;
 	frame_ = SDL_CreateGPUTexture(gpu.device, &ti);
-	scratch(Stage::kWidth, Stage::kHeight);
+	scratch(Stage::kWidth * ss_, Stage::kHeight * ss_);
 
 	const uint8_t px[4] = {255, 255, 255, 255};
 	white_.gpu = gpu.create_texture_rgba8(1, 1, px);
@@ -402,7 +403,7 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			float* dst = map + static_cast<size_t>(fx_index[pi]) * 16;
 			std::memset(dst, 0, 64);
 			std::memcpy(dst, list[pi].p, sizeof(list[pi].p));
-			if (list[pi].op == RenderPass::Op::Blur && dst[2] < 0.25f) dst[2] = 0.25f; // no blur below a quarter texel
+			if (list[pi].op == RenderPass::Op::Blur) dst[2] = std::max(0.25f, dst[2] * (list[pi].hi ? ss_ : 1)); // no blur below a quarter texel
 		}
 		SDL_UnmapGPUTransferBuffer(gpu_->device, ptransfer_);
 		SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
@@ -455,10 +456,12 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 		const RenderPass& ps = list[pi];
 		const std::vector<DrawItem>& items = ps.items;
 		const bool to_target = ps.target != nullptr || ps.temp_target >= 0;
+		const int k = ps.hi ? ss_ : 1; // texture pixels per logical pixel in this pass
+		const int tw = ps.w * k, th = ps.h * k;
 		SDL_GPUTexture* target = frame_;
 		if (ps.target) target = ps.target->gpu;
-		else if (ps.temp_target >= 0) target = temp_texture(ps.temp_target, ps.w, ps.h)->gpu;
-		Scratch& sc = scratch(ps.w, ps.h);
+		else if (ps.temp_target >= 0) target = temp_texture(ps.temp_target, tw, th)->gpu;
+		Scratch& sc = scratch(tw, th);
 		const size_t base = pass_base[pi];
 
 		if (ps.op != RenderPass::Op::Draw) { // post effect over a temporary texture
@@ -466,7 +469,7 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			begin_pass(target, true, 0.f);
 			if (SDL_GPUGraphicsPipeline* p = fx_pipeline(blur)) {
 				SDL_BindGPUGraphicsPipeline(rp, p);
-				SDL_GPUTextureSamplerBinding ts[2] = {{temp_texture(ps.in_temp, ps.w, ps.h)->gpu, sampler_linear_},
+				SDL_GPUTextureSamplerBinding ts[2] = {{temp_texture(ps.in_temp, tw, th)->gpu, sampler_linear_},
 													   {fx_params_[fx_index[pi]], sampler_point_}};
 				SDL_BindGPUFragmentSamplers(rp, 0, ts, 2);
 				SDL_DrawGPUPrimitives(rp, 6, 1, static_cast<Uint32>(base), 0);
@@ -474,7 +477,7 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 			end_pass();
 			continue;
 		}
-		auto item_tex = [&](const DrawItem& d) -> const Texture* { return d.temp >= 0 ? temp_texture(d.temp, ps.w, ps.h) : tex_of(d.texture); };
+		auto item_tex = [&](const DrawItem& d) -> const Texture* { return d.temp >= 0 ? temp_texture(d.temp, tw, th) : tex_of(d.texture); };
 		auto is_plain = [&](const DrawItem& d) {
 			return !d.has_mask && !d.trans_tex && !blend_reads_destination(d.blend) && d.snap == DrawItem::Snap::None;
 		};
@@ -514,9 +517,9 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 					}
 					end_pass();
 				}
-				if (reads_dest || snap_screen) copy_texture(target, sc.dest, ps.w, ps.h);
+				if (reads_dest || snap_screen) copy_texture(target, sc.dest, tw, th);
 				if (snap_capture && it.texture && it.texture->gpu)
-					copy_texture(target, it.texture->gpu, std::min(ps.w, it.texture->w), std::min(ps.h, it.texture->h));
+					copy_texture(target, it.texture->gpu, std::min(tw, it.texture->w), std::min(th, it.texture->h));
 				begin_pass(target, false, 1.f);
 			}
 
@@ -557,8 +560,8 @@ bool Renderer2D::render_frame(const DrawList& list) {
 	const float dw = Stage::kWidth * scale, dh = Stage::kHeight * scale;
 	SDL_GPUBlitInfo bi{};
 	bi.source.texture = frame_;
-	bi.source.w = Stage::kWidth;
-	bi.source.h = Stage::kHeight;
+	bi.source.w = Stage::kWidth * ss_;
+	bi.source.h = Stage::kHeight * ss_;
 	bi.destination.texture = swap;
 	bi.destination.x = static_cast<Uint32>((sw - dw) / 2);
 	bi.destination.y = static_cast<Uint32>((sh - dh) / 2);
@@ -575,14 +578,15 @@ bool Renderer2D::render_frame(const DrawList& list) {
 bool Renderer2D::save_frame_png(const DrawList& list, const std::string& path) {
 	SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(gpu_->device);
 	draw_passes(cmd, list);
-	const Uint32 bytes = Stage::kWidth * Stage::kHeight * 4;
+	const Uint32 fw = Stage::kWidth * ss_, fh = Stage::kHeight * ss_;
+	const Uint32 bytes = fw * fh * 4;
 	SDL_GPUTransferBufferCreateInfo tbi{SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD, bytes, 0};
 	SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(gpu_->device, &tbi);
 	SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
 	SDL_GPUTextureRegion reg{};
 	reg.texture = frame_;
-	reg.w = Stage::kWidth;
-	reg.h = Stage::kHeight;
+	reg.w = fw;
+	reg.h = fh;
 	reg.d = 1;
 	SDL_GPUTextureTransferInfo dst{tb, 0, 0, 0};
 	SDL_DownloadFromGPUTexture(cp, &reg, &dst);
@@ -591,7 +595,7 @@ bool Renderer2D::save_frame_png(const DrawList& list, const std::string& path) {
 	SDL_WaitForGPUFences(gpu_->device, true, &fence, 1);
 	SDL_ReleaseGPUFence(gpu_->device, fence);
 	void* data = SDL_MapGPUTransferBuffer(gpu_->device, tb, false);
-	SDL_Surface* surf = SDL_CreateSurfaceFrom(Stage::kWidth, Stage::kHeight, SDL_PIXELFORMAT_RGBA32, data, Stage::kWidth * 4);
+	SDL_Surface* surf = SDL_CreateSurfaceFrom(fw, fh, SDL_PIXELFORMAT_RGBA32, data, fw * 4);
 	const bool ok = SDL_SavePNG(surf, path.c_str());
 	SDL_DestroySurface(surf);
 	SDL_UnmapGPUTransferBuffer(gpu_->device, tb);
