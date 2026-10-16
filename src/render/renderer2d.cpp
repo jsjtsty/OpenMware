@@ -78,7 +78,12 @@ bool Renderer2D::init(GpuContext& gpu, const GameFiles& files, std::string* erro
 	ti.type = SDL_GPU_TEXTURETYPE_2D;
 	ti.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
 	ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
-	if (const char* e = std::getenv("OMW_SS")) ss_ = std::clamp(std::atoi(e), 1, 4);
+	{ // supersampling factor: enough texture pixels for the biggest display (the window can be dragged anywhere), 1..4
+		int h = Stage::kHeight * 2;
+		if (const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(gpu.window))) h = dm->h;
+		ss_ = std::clamp((h + Stage::kHeight - 1) / Stage::kHeight, 1, 4);
+		if (const char* e = std::getenv("OMW_SS")) ss_ = std::clamp(std::atoi(e), 1, 4);
+	}
 	ti.width = Stage::kWidth * ss_;
 	ti.height = Stage::kHeight * ss_;
 	ti.layer_count_or_depth = 1;
