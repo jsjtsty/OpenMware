@@ -109,6 +109,15 @@ struct Sprite {
 		float alpha = 0;
 		std::vector<Pose> hist; // oldest first, the last entry is the current frame
 	} blur;
+	// SetBezier/BeginBezier: the sprite follows chained cubic curves through the control points (groups of four: start, two
+	// handles, end), given as offsets from where it was when the move began; `u` runs 0..1 over the move time with the tempo.
+	struct BezierPath {
+		std::vector<std::array<float, 3>> pts;
+		std::array<float, 3> origin{};
+		Anim<1> u;
+		bool on = false;
+		void apply(float u_now, Anim<3>& move) const;
+	} bezier;
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
 	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)

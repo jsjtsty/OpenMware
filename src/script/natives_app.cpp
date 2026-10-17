@@ -89,7 +89,16 @@ SQInteger get_frame_speed(HSQUIRRELVM v) { sq_pushfloat(v, app().frame_speed); r
 SQInteger get_product_name(HSQUIRRELVM v) { sq_pushstring(v, "OpenMware", -1); return 1; }
 SQInteger get_platform_name(HSQUIRRELVM v) { sq_pushstring(v, "Windows", -1); return 1; }
 SQInteger set_window_title(HSQUIRRELVM v) { app().title = arg_string(v, 2); return 0; }
-SQInteger exit_app(HSQUIRRELVM) { app().closing = true; return 0; }
+SQInteger exit_app(HSQUIRRELVM v) {
+	std::printf("[app] exit requested by the script (frame %d)\n", ScriptHost::current()->frame);
+	if (ScriptHost::current()->verbose) { // where from: the Squirrel call stack
+		SQStackInfos si;
+		for (SQInteger lvl = 1; SQ_SUCCEEDED(sq_stackinfos(v, lvl, &si)); lvl++)
+			std::printf("    at %s (%s:%d)\n", si.funcname ? si.funcname : "?", si.source ? si.source : "?", static_cast<int>(si.line));
+	}
+	app().closing = true;
+	return 0;
+}
 SQInteger set_full_screen(HSQUIRRELVM v) { app().full_screen = arg_int(v, 2) != 0; return 0; }
 SQInteger is_full_screen(HSQUIRRELVM v) { sq_pushbool(v, app().full_screen); return 1; }
 SQInteger create_directory(HSQUIRRELVM v) {

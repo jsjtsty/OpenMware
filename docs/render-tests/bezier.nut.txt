@@ -1,0 +1,6 @@
+::k <- SQSprite("k"); ::k.createColor(1024,576,20,20,60); ::k.setPriority(29000);
+::a <- SQSprite("a"); ::a.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); ::a.setPriority(29500);
+::a.scale(0.25, 0.25, 0, 0); ::a.move(0, 144, 0, 0);
+// one cubic curve, offsets from the start position; 90 frames
+::a.resetBezier(); ::a.setBezier(0, 0); ::a.setBezier(300, -300); ::a.setBezier(600, 300); ::a.setBezier(800, 0);
+::a.beginBezier(1500, 0);

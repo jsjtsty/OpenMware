@@ -48,10 +48,26 @@ Sprite::Sprite() {
 	for (auto& c : color) c.set({255.f, 255.f, 255.f});
 }
 
+void Sprite::BezierPath::apply(float u_now, Anim<3>& move) const {
+	const size_t segments = pts.size() / 4;
+	if (segments == 0) return;
+	const float s = std::clamp(u_now, 0.f, 1.f) * static_cast<float>(segments);
+	const size_t seg = std::min(static_cast<size_t>(s), segments - 1);
+	const float t = s - static_cast<float>(seg), k = 1.f - t;
+	const float b0 = k * k * k, b1 = 3 * k * k * t, b2 = 3 * k * t * t, b3 = t * t * t;
+	for (int i = 0; i < 3; i++)
+		move.value[i] = origin[i] + b0 * pts[seg * 4][i] + b1 * pts[seg * 4 + 1][i] + b2 * pts[seg * 4 + 2][i] + b3 * pts[seg * 4 + 3][i];
+}
+
 void Sprite::update(float dt_ms) {
 	const float dt = dt_ms * time_scale;
 	if (tick) tick(dt);
 	move.update(dt);
+	if (bezier.on) {
+		bezier.u.update(dt);
+		bezier.apply(bezier.u.value[0], move);
+		if (!bezier.u.active) bezier.on = false;
+	}
 	scale.update(dt);
 	rotate.update(dt);
 	fade.update(dt);

@@ -34,6 +34,12 @@ int main(int argc, char** argv) {
 	struct AutoClick { int first, period; float x, y; };
 	std::vector<AutoClick> auto_clicks; // --auto FIRST:PERIOD:X:Y (a click every PERIOD frames from FIRST on)
 	std::vector<std::pair<int, std::string>> shots_at; // --shot-at FRAME:PATH (extra screenshots on the way, implies offscreen)
+	struct EvalEvery {
+		int first, period;
+		std::string code;
+	};
+	std::vector<EvalEvery> eval_every; // --eval-every FIRST:PERIOD:SNIPPET
+	std::vector<std::pair<int, int>> holds; // --hold FRAME:KEYCODE
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
 	for (int i = 2; i < argc; i++) {
 		const std::string a = argv[i];
@@ -66,6 +72,15 @@ int main(int argc, char** argv) {
 			std::stringstream ss;
 			ss << in.rdbuf();
 			evals.emplace_back(std::atoi(spec.c_str()), ss.str());
+		}
+		else if (a == "--eval-every" && i + 1 < argc) { // FIRST:PERIOD:SNIPPET, run again every PERIOD frames
+			const std::string spec = argv[++i];
+			const size_t c1 = spec.find(':'), c2 = c1 == std::string::npos ? c1 : spec.find(':', c1 + 1);
+			if (c2 != std::string::npos) eval_every.push_back({std::atoi(spec.c_str()), std::atoi(spec.c_str() + c1 + 1), spec.substr(c2 + 1)});
+		}
+		else if (a == "--hold" && i + 1 < argc) { // FRAME:KEYCODE, the key stays down from that frame on
+			int f = 0, k = 0;
+			if (std::sscanf(argv[++i], "%d:%d", &f, &k) == 2) holds.emplace_back(f, k);
 		}
 		else if (a == "--press" && i + 1 < argc) {
 			int f = 0, k = 0;
@@ -134,8 +149,12 @@ int main(int argc, char** argv) {
 		}
 		for (const auto& [f, k] : taps)
 			if (f == frame) input.tap_key(k);
+		for (const auto& [f, k] : holds)
+			if (f == frame) input.hold_key(k);
 		for (const auto& [f, code] : evals)
 			if (f == frame) host.debug_eval(code.c_str());
+		for (const auto& e : eval_every)
+			if (e.period > 0 && frame >= e.first && (frame - e.first) % e.period == 0) host.debug_eval(e.code.c_str());
 		for (const auto& c : mouse_cmds)
 			if (c.frame == frame) {
 				input.set_cursor(c.x, c.y);

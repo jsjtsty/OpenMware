@@ -259,7 +259,46 @@ SQInteger get_color(HSQUIRRELVM v) {
 }
 
 SQInteger is_deleted_texture(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
-SQInteger is_moving(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->move.active); return 1; }
+SQInteger is_moving(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->move.active || spr(v)->bezier.on); return 1; }
+
+// Bezier paths: resetBezier(), setBezier(x, y[, z]) appends a control point, beginBezier(time_ms, tempo) starts the move.
+SQInteger reset_bezier(HSQUIRRELVM v) {
+	spr(v)->bezier.pts.clear();
+	spr(v)->bezier.on = false;
+	return 0;
+}
+SQInteger set_bezier(HSQUIRRELVM v) {
+	const float z = sq_gettop(v) >= 4 ? arg_float(v, 4) : 0.f;
+	spr(v)->bezier.pts.push_back({arg_float(v, 2), arg_float(v, 3), z});
+	return 0;
+}
+SQInteger begin_bezier(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	auto& b = s->bezier;
+	b.origin = {s->move.value[0], s->move.value[1], s->move.value[2]};
+	b.u.set({0.f});
+	b.u.start({1.f}, arg_float(v, 2), static_cast<int>(arg_int(v, 3)));
+	b.on = true;
+	if (!b.u.active) {
+		b.apply(1.f, s->move);
+		b.on = false;
+	}
+	return 0;
+}
+SQInteger get_bezier_timer(HSQUIRRELVM v) {
+	const auto& b = spr(v)->bezier;
+	sq_pushfloat(v, b.on && b.u.active ? b.u.timer : 0.f);
+	return 1;
+}
+SQInteger set_bezier_timer(HSQUIRRELVM v) {
+	Sprite* s = spr(v);
+	if (s->bezier.on) {
+		s->bezier.u.set_timer(arg_float(v, 2));
+		s->bezier.apply(s->bezier.u.value[0], s->move);
+		if (!s->bezier.u.active) s->bezier.on = false;
+	}
+	return 0;
+}
 SQInteger is_fading(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->fade.active); return 1; }
 SQInteger is_scaling(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->scale.active); return 1; }
 SQInteger is_rotating(HSQUIRRELVM v) { sq_pushbool(v, spr(v)->rotate.active); return 1; }
@@ -284,6 +323,11 @@ void register_sprite_property_methods(ScriptHost& h) {
 	h.add_method("getRotate", get_rotate);
 	h.add_method("setPivot", set_pivot);
 	h.add_method("isMoving", is_moving);
+	h.add_method("resetBezier", reset_bezier);
+	h.add_method("setBezier", set_bezier);
+	h.add_method("beginBezier", begin_bezier);
+	h.add_method("getBezierTimer", get_bezier_timer);
+	h.add_method("setBezierTimer", set_bezier_timer);
 	h.add_method("isFading", is_fading);
 	h.add_method("isScaling", is_scaling);
 	h.add_method("isRotating", is_rotating);

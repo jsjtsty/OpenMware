@@ -333,7 +333,6 @@ void register_text_class(ScriptHost& h) {
 	h.add_method("getLock", ret_zero);
 	h.add_method("getDisused", ret_zero);
 	h.add_method("resetSpline", ret_null);
-	h.add_method("resetBezier", ret_null);
 	h.add_method("isShaking", ret_false);
 	h.end_class();
 }

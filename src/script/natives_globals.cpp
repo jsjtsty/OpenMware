@@ -1,4 +1,5 @@
 // Global native functions of the script runtime (the ones InitializeSquirrelRuntime registers in the original exe).
+#include "game/input.h"
 #include "game/text_markup.h"
 #include "script/bind.h"
 #include "script/host.h"
@@ -101,7 +102,11 @@ void register_global_natives(ScriptHost& h) {
 			std::fprintf(stderr, "    at %s (%s:%d)\n", si.funcname ? si.funcname : "?", si.source ? si.source : "?", static_cast<int>(si.line));
 		return 0;
 	});
-	h.add_global("OMW_Log", [](HSQUIRRELVM v) -> SQInteger { std::fprintf(stderr, "%s", sqb::arg_string(v, 2).c_str()); return 0; }); // debugging aid for OMW_EVAL
+	h.add_global("OMW_TapKey", [](HSQUIRRELVM v) -> SQInteger { // debugging aid: a scripted key tap (DirectInput scancode)
+		if (ScriptHost::current()->input) ScriptHost::current()->input->tap_key(static_cast<int>(sqb::arg_int(v, 2)));
+		return 0;
+	});
+	h.add_global("OMW_Log",[](HSQUIRRELVM v) -> SQInteger { std::fprintf(stderr, "%s", sqb::arg_string(v, 2).c_str()); return 0; }); // debugging aid for OMW_EVAL
 	h.add_global("CountTextLength", count_text_length);
 	h.add_global("SetClearTrue", [](HSQUIRRELVM) -> SQInteger { return 0; }); // platform achievement hook (Steam); nothing to do here
 	h.add_global("FileDelete", file_delete);
