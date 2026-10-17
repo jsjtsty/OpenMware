@@ -48,7 +48,7 @@ See [docs/running.md](docs/running.md) and, for phones, [docs/mobile.md](docs/mo
 
 | Path | Contents |
 | --- | --- |
-| `src/`, `apps/` | engine libraries and the `omw` executable |
+| `src/`, `apps/` | engine libraries and the `OpenMware` executable |
 | `third_party/squirrel2` | Squirrel 2.2.4 fork |
 | `shaders/` | HLSL sources and pre-compiled `prebuilt/{spv,dxil,msl}` |
 | `tools/`, `scripts/` | developer tools (archive extractor, script disassembler, reverse-engineering helpers) |

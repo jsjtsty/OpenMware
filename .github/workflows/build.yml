@@ -97,7 +97,7 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
-        run: cmake --build build --target omw
+        run: cmake --build build --target openmware
 
       - name: Test
         run: cmake --build build --target test_easing && build/test_easing
@@ -141,7 +141,7 @@ jobs:
             -DANDROID_PLATFORM=android-26
 
       - name: Build libmain.so and libSDL3.so
-        run: cmake --build build --target omw
+        run: cmake --build build --target openmware
 
       - name: Assemble the APK
         run: |
@@ -172,7 +172,7 @@ jobs:
 
       - name: Build (unsigned)
         run: >
-          cmake --build build --config Release --target omw --
+          cmake --build build --config Release --target openmware --
           CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
       - name: Package an unsigned IPA
