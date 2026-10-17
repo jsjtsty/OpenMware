@@ -2,7 +2,7 @@
 # Starts every story script directly (the game's own "dropped file" debug entry, g_DroppedFileName), forces Skip, and records
 # script errors per script. Usage: scripts/sweep_scripts.sh WORKER_INDEX WORKER_COUNT [FRAMES]
 # Output: ref/sweep_dropped/NAME.txt (only for scripts that error) and ref/sweep_dropped/_done.WORKER (finished names).
-# Needs build/vcpkg/omw.exe, keys.local.txt and the decompiled scripts in ref/work/dec/nut (for the name list).
+# Needs build/src/OpenMware.exe, keys.local.txt and the decompiled scripts in ref/work/dec/nut (for the name list).
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IDX="${1:-0}"
 CNT="${2:-1}"
@@ -19,7 +19,7 @@ for f in "$ROOT"/ref/work/dec/nut/*.nut.txt; do
 	n=$((n + 1))
 	[ $((n % CNT)) -eq "$IDX" ] || continue
 	rm -rf save
-	timeout 180 "$ROOT/build/vcpkg/omw.exe" "$GAME" --keys "$ROOT/keys.local.txt" --shaders "$ROOT/build/vcpkg/shaders" \
+	timeout 180 "$ROOT/build/src/OpenMware.exe" "$GAME" --keys "$ROOT/keys.local.txt" --shaders "$ROOT/build/src/shaders" \
 		--frames "$FRAMES" --shot "$WORK/shot.png" \
 		--eval "200:g_DroppedFileName=\"media/script/nut/$name.nut\"" \
 		--eval "250:System.skip_absolute=1" \

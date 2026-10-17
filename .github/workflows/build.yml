@@ -63,7 +63,7 @@ jobs:
         run: |
           $out = 'dist/OpenMware-windows-x64'
           New-Item -ItemType Directory -Force $out | Out-Null
-          Copy-Item build/omw.exe, build/npktool.exe $out
+          Copy-Item build/OpenMware.exe, build/npktool.exe $out
           Copy-Item build/*.dll $out   # FFmpeg (LGPL) stays a set of DLLs next to the program
           Copy-Item -Recurse build/ffmpeg-install/licenses "$out/licenses"
           # Windows GPUs take SPIR-V (Vulkan) or DXIL (Direct3D 12); both sets were copied next to the executable.
@@ -104,9 +104,9 @@ jobs:
 
       - name: Sign (ad hoc) and package
         run: |
-          codesign --force --deep --sign - build/omw.app
+          codesign --force --deep --sign - build/OpenMware.app
           mkdir -p dist
-          ditto -c -k --keepParent build/omw.app dist/OpenMware-macos-arm64.zip
+          ditto -c -k --keepParent build/OpenMware.app dist/OpenMware-macos-arm64.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -178,7 +178,7 @@ jobs:
       - name: Package an unsigned IPA
         run: |
           mkdir -p dist/Payload
-          cp -R build/Release-iphoneos/omw.app dist/Payload/
+          cp -R build/Release-iphoneos/OpenMware.app dist/Payload/
           (cd dist && zip -qry OpenMware-ios-arm64-unsigned.ipa Payload)
 
       - uses: actions/upload-artifact@v4

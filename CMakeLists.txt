@@ -88,6 +88,7 @@ if(ANDROID)
 	set_target_properties(omw PROPERTIES OUTPUT_NAME main)
 else()
 	add_executable(omw apps/omw.cpp)
+	set_target_properties(omw PROPERTIES OUTPUT_NAME OpenMware) # OpenMware.exe / OpenMware.app
 endif()
 target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
 add_dependencies(omw omw_shaders)

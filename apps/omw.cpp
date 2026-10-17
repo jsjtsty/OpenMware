@@ -1,4 +1,4 @@
-// omw: runs the game. Usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]
+// OpenMware: runs the game. Usage: OpenMware GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]
 //   --frames N  stop after N frames;  --shot FILE  with --frames: save the last frame as PNG (offscreen, no presentation)
 #include "audio/audio.h"
 #include "game/game_files.h"
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 	const bool mobile = platform == "Android" || platform == "iOS";
 	const bool has_game_arg = argc >= 2 && argv[1][0] != '-';
 	if (!has_game_arg && !mobile) {
-		std::fputs("usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--data-dir DIR] [--frames N] [--shot FILE]\n", stderr);
+		std::fputs("usage: OpenMware GAME_DIR [--keys FILE] [--shaders DIR] [--data-dir DIR] [--frames N] [--shot FILE]\n", stderr);
 		return 2;
 	}
 	// Arguments are UTF-8 (SDL_main converts them on Windows); a plain path(const char*) would read them in the ANSI code page.

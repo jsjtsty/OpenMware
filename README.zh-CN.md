@@ -39,7 +39,7 @@ cmake --build build
 ## 运行
 
 ```powershell
-omw.exe "D:\Games\<游戏目录>" --keys keys.txt
+OpenMware.exe "D:\Games\<游戏目录>" --keys keys.txt
 ```
 
 详见 [docs/running.md](docs/running.md)；手机端见 [docs/mobile.md](docs/mobile.md)。

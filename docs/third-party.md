@@ -13,7 +13,7 @@
 
 FFmpeg is configured without `--enable-gpl` and `--enable-nonfree` (decoders: wmv3, vc1, wmapro, wmav2; demuxer: asf; plus swscale and swresample), and is built as shared libraries (`OMW_FFMPEG_SHARED=ON`, the default) that every package ships beside the program, so a user can replace them with their own build of FFmpeg:
 
-* Windows: `avcodec-*.dll` etc. next to `omw.exe`
+* Windows: `avcodec-*.dll` etc. next to `OpenMware.exe`
 * Linux: `lib/` next to the executable (rpath `$ORIGIN/lib`)
 * macOS / iOS: `Frameworks/` inside the app bundle (rpath `@executable_path/../Frameworks`)
 * Android: `lib/arm64-v8a/lib*-<major>.so` inside the APK

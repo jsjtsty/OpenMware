@@ -39,7 +39,7 @@ See [docs/building.md](docs/building.md) for per-platform notes (MSYS2 for FFmpe
 ## Running
 
 ```powershell
-omw.exe "D:\Games\<game folder>" --keys keys.txt
+OpenMware.exe "D:\Games\<game folder>" --keys keys.txt
 ```
 
 See [docs/running.md](docs/running.md) and, for phones, [docs/mobile.md](docs/mobile.md).

@@ -3,7 +3,7 @@
 OpenMware is an engine; it does not contain the game. Point it at your own copy of the game's folder (the one holding the `.npk` archives):
 
 ```powershell
-omw.exe "D:\Games\<game folder>" --keys keys.txt
+OpenMware.exe "D:\Games\<game folder>" --keys keys.txt
 ```
 
 * `--keys <file>`: the decryption keys file (default `keys.local.txt`).
