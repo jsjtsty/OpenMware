@@ -11,10 +11,11 @@ foreach(_f IN LISTS _msl)
 	if(EXISTS "${_lib}" AND NOT "${_f}" IS_NEWER_THAN "${_lib}")
 		continue()
 	endif()
-	execute_process(COMMAND xcrun -sdk ${SDK} metal -c "${_f}" -o "${_air}" ${MIN}
-		RESULT_VARIABLE _rc ERROR_VARIABLE _err)
-	if(_rc)
-		message(FATAL_ERROR "metal failed for ${_f}:\n${_err}")
+	# -x metal: the .msl extension is not one the compiler driver knows
+	execute_process(COMMAND xcrun -sdk ${SDK} metal -x metal -c "${_f}" -o "${_air}" ${MIN}
+		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
+	if(_rc OR NOT EXISTS "${_air}")
+		message(FATAL_ERROR "metal failed (${_rc}) for ${_f}:\n${_out}\n${_err}")
 	endif()
 	execute_process(COMMAND xcrun -sdk ${SDK} metallib "${_air}" -o "${_lib}" RESULT_VARIABLE _rc ERROR_VARIABLE _err)
 	if(_rc)

@@ -163,7 +163,7 @@ file(WRITE "${_ff_script}"
 ${_ff_pre}
 cd '${_ff_build_sh}'
 if [ ! -f config.h ]; then
-  \"\$1/configure\"${_ff_quoted}
+  \"\$1/configure\"${_ff_quoted} || { echo '--- ffbuild/config.log (tail) ---'; tail -n 80 ffbuild/config.log; echo 'PATH='\"\$PATH\"; exit 1; }
 fi
 make -j\"\$(nproc 2>/dev/null || sysctl -n hw.ncpu)\" ${_ff_make_vars}
 make install ${_ff_make_vars}
