@@ -29,8 +29,8 @@ int main(int argc, char** argv) {
 	bool trace = false;
 	std::string shot;
 	std::vector<std::pair<int, std::string>> evals; // --eval FRAME:CODE (run a script snippet at a frame)
-	struct MouseCmd { int frame; float x, y; bool click; };
-	std::vector<MouseCmd> mouse_cmds; // --mouse FRAME:X:Y[:click]
+	struct MouseCmd { int frame; float x, y; bool click; int button = 0; };
+	std::vector<MouseCmd> mouse_cmds; // --mouse FRAME:X:Y[:click|:rclick]
 	struct AutoClick { int first, period; float x, y; };
 	std::vector<AutoClick> auto_clicks; // --auto FIRST:PERIOD:X:Y (a click every PERIOD frames from FIRST on)
 	std::vector<std::pair<int, std::string>> shots_at; // --shot-at FRAME:PATH (extra screenshots on the way, implies offscreen)
@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
 			MouseCmd c{0, 0, 0, false};
 			const std::string spec = argv[++i];
 			c.click = spec.find("click") != std::string::npos;
+			if (spec.find("rclick") != std::string::npos) c.button = 1;
 			if (std::sscanf(spec.c_str(), "%d:%f:%f", &c.frame, &c.x, &c.y) == 3) mouse_cmds.push_back(c);
 		}
 		else if (a == "--eval-file" && i + 1 < argc) { // FRAME:PATH (script snippet read from a UTF-8 file)
@@ -165,7 +166,7 @@ int main(int argc, char** argv) {
 			for (const auto& c : mouse_cmds)
 				if (c.frame == frame) {
 					input.set_cursor(c.x, c.y);
-					if (c.click) input.tap_mouse();
+					if (c.click) input.tap_mouse(c.button);
 				}
 			for (const auto& c : auto_clicks)
 				if (frame >= c.first && (frame - c.first) % c.period == 0) {

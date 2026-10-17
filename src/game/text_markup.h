@@ -8,6 +8,7 @@ namespace omw {
 struct TextRun {
 	std::string text; // visible characters (UTF-8), raw, may contain line breaks
 	std::string ruby; // furigana for this run (empty when none)
+	bool center = false; // inside <center>...</center>: its lines are centered in the text field
 };
 
 // Splits marked-up UTF-8 text into runs. Unknown tags are dropped, their content is kept.

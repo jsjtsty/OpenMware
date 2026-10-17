@@ -30,7 +30,7 @@ struct InputState {
 
 	// Test hooks: place the cursor (overrides the real one from then on) and click the left button (down next frame, up after).
 	void set_cursor(float x, float y) { override_ = true; mouse_x = x; mouse_y = y; }
-	void tap_mouse() { mouse_tap_ = 2; }
+	void tap_mouse(int button = 0) { mouse_tap_[button & 1] = 2; } // 0 left, 1 right
 
 	int mouse_state(int button) const;
 	// Script key query: held (trigger=false), or only on the frame it went down (trigger=true). A positive repeat_ms
@@ -39,7 +39,7 @@ struct InputState {
 private:
 	int tap_[256] = {};
 	bool hold_[256] = {};
-	int mouse_tap_ = 0;
+	int mouse_tap_[2] = {};
 	bool override_ = false;
 	float last_x_ = 0, last_y_ = 0;
 };

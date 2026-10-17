@@ -139,13 +139,15 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 			key_held_ms[i] = key_repeat_ms[i] = 0;
 		}
 	}
-	if (mouse_tap_ == 2) {
-		mouse_down[0] = mouse_pressed[0] = true;
-		mouse_tap_ = 1;
-	} else if (mouse_tap_ == 1) {
-		mouse_down[0] = false;
-		mouse_released[0] = true;
-		mouse_tap_ = 0;
+	for (int b = 0; b < 2; b++) {
+		if (mouse_tap_[b] == 2) {
+			mouse_down[b] = mouse_pressed[b] = true;
+			mouse_tap_[b] = 1;
+		} else if (mouse_tap_[b] == 1) {
+			mouse_down[b] = false;
+			mouse_released[b] = true;
+			mouse_tap_[b] = 0;
+		}
 	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {

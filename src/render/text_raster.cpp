@@ -145,17 +145,25 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 	float x = 0, line_top = 0;
 	bool line_empty = true;
 	int ruby_index = 0;
+	int line_no = 0;
+	bool any_center = false;
+	std::vector<int> glyph_line, base_line, ruby_line; // line of each glyph / base character / ruby block (for <center>)
+	std::vector<char> glyph_center;
+	std::vector<char> base_center, ruby_center;
 	auto newline = [&]() {
 		x = 0;
 		line_top += pitch;
 		line_empty = true;
+		line_no++;
 	};
 
 	for (const TextRun& run : runs) {
 		const std::vector<uint32_t> cps = decode_utf8(run.text);
 		const int first_base = out.char_count;
 		float run_x0 = x, run_line_top = line_top;
+		int run_line_no = line_no;
 		bool run_started = false;
+		any_center = any_center || run.center;
 		for (uint32_t cp : cps) {
 			if (cp == '\r' || cp == '\t') continue;
 			if (cp == '\n') {
@@ -167,6 +175,7 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 			if (!run_started) {
 				run_x0 = x;
 				run_line_top = line_top;
+				run_line_no = line_no;
 				run_started = true;
 			}
 			LaidGlyph g;
@@ -177,8 +186,13 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 			g.face = st.font.face;
 			g.index = out.char_count++;
 			out.glyphs.push_back(g);
+			glyph_line.push_back(line_no);
+			glyph_center.push_back(run.center);
 			out.char_rects.push_back({x, line_top + base_dy, adv, size});
+			base_line.push_back(line_no);
+			base_center.push_back(run.center);
 			x += adv;
+			out.width = std::max(out.width, x); // the widest line, not just the last one
 			line_empty = false;
 		}
 		if (!run.ruby.empty() && run_started) {
@@ -199,14 +213,39 @@ TextLayout layout_text(const std::vector<TextRun>& runs, const TextStyle& st) {
 				g.ruby = true;
 				g.base_first = first_base;
 				out.glyphs.push_back(g);
+				glyph_line.push_back(run_line_no);
+				glyph_center.push_back(run.center);
 				rx += advance_of(st.ruby_font, cp);
 			}
 			out.ruby_rects.push_back({start, run_line_top, rw, ruby_h});
+			ruby_line.push_back(run_line_no);
+			ruby_center.push_back(run.center);
 			ruby_index++;
 		}
-		out.width = std::max(out.width, x);
 	}
 	out.height = line_top + (line_empty ? 0.f : std::max(pitch, base_dy + asc + descent_of(st.font))); // negative row spacing must not clip the glyphs
+	if (!out.glyphs.empty()) { // text that ends with a line break must still keep the descent of its last glyph row
+		float bottom = 0;
+		for (const LaidGlyph& g : out.glyphs)
+			if (!g.ruby) bottom = std::max(bottom, g.baseline + descent_of(st.font));
+		out.height = std::max(out.height, bottom);
+	}
+
+	if (any_center) {
+		// <center>: each such line is centered in the text field (the screen width when the script gave none).
+		const float field = st.field_w > 0 ? static_cast<float>(st.field_w) : 1024.f;
+		std::vector<float> line_right(static_cast<size_t>(line_no) + 1, 0.f);
+		for (size_t i = 0; i < out.char_rects.size(); i++)
+			line_right[base_line[i]] = std::max(line_right[base_line[i]], out.char_rects[i].x + out.char_rects[i].w);
+		auto shift = [&](int line) { return std::max(0.f, (field - line_right[line]) * 0.5f); };
+		for (size_t i = 0; i < out.glyphs.size(); i++)
+			if (glyph_center[i]) out.glyphs[i].x += shift(glyph_line[i]);
+		for (size_t i = 0; i < out.char_rects.size(); i++)
+			if (base_center[i]) out.char_rects[i].x += shift(base_line[i]);
+		for (size_t i = 0; i < out.ruby_rects.size(); i++)
+			if (ruby_center[i]) out.ruby_rects[i].x += shift(ruby_line[i]);
+		out.width = std::max(out.width, field);
+	}
 	return out;
 }
 

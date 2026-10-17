@@ -67,6 +67,7 @@ struct TextRef : SpriteRef {
 			style.shadow_color[i] = shadow_color[0][i];
 		}
 		layout = layout_text(runs, style);
+		if (host().verbose) std::printf("[text %s] layout %.0fx%.0f, %d chars, %zu runs\n", sprite ? sprite->name.c_str() : "?", layout.width, layout.height, layout.char_count, runs.size());
 		dirty = false;
 		shown = -1;
 	}

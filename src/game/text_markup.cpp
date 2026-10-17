@@ -29,8 +29,9 @@ std::vector<TextRun> parse_text_markup(const std::string& src) {
 	std::vector<TextRun> runs;
 	TextRun cur;
 	std::string ruby_pending;
-	bool in_ruby = false;
+	bool in_ruby = false, centered = false;
 	auto flush = [&]() {
+		cur.center = centered;
 		if (!cur.text.empty() || !cur.ruby.empty()) runs.push_back(cur);
 		cur = {};
 	};
@@ -51,6 +52,12 @@ std::vector<TextRun> parse_text_markup(const std::string& src) {
 				} else if (tag == "/RUBY") {
 					flush();
 					in_ruby = false;
+				} else if (tag == "center" || tag == "CENTER") {
+					flush();
+					centered = true;
+				} else if (tag == "/center" || tag == "/CENTER") {
+					flush();
+					centered = false;
 				}
 				i = gt + 1;
 				continue;
