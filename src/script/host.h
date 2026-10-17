@@ -16,6 +16,7 @@ namespace omw {
 // State shared between the script natives and the platform layer (window, input, audio).
 struct AppState {
 	bool closing = false;
+	bool reboot = false; // ::RebootRequest(): after the script exits, start the game again from the boot script
 	std::string title;
 	std::map<std::string, double> config; // Config_* values; unknown ones read as 0
 	bool full_screen = false;

@@ -106,6 +106,10 @@ void register_global_natives(ScriptHost& h) {
 		if (ScriptHost::current()->input) ScriptHost::current()->input->tap_key(static_cast<int>(sqb::arg_int(v, 2)));
 		return 0;
 	});
+	h.add_global("RebootRequest", [](HSQUIRRELVM) -> SQInteger { // the game restarts itself after g_App.exit() (the story's "reboot" into the second playthrough)
+		ScriptHost::current()->app.reboot = true;
+		return 0;
+	});
 	h.add_global("OMW_Log",[](HSQUIRRELVM v) -> SQInteger { std::fprintf(stderr, "%s", sqb::arg_string(v, 2).c_str()); return 0; }); // debugging aid for OMW_EVAL
 	h.add_global("CountTextLength", count_text_length);
 	h.add_global("SetClearTrue", [](HSQUIRRELVM) -> SQInteger { return 0; }); // platform achievement hook (Steam); nothing to do here
