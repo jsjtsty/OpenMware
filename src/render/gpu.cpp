@@ -23,6 +23,8 @@ bool GpuContext::init(const char* title, int width, int height, const std::files
 	// Metal: precompiled libraries are preferred (built by CMake on Apple hosts); the MSL source is compiled by the driver at load.
 	else if (have & SDL_GPU_SHADERFORMAT_METALLIB) { format = SDL_GPU_SHADERFORMAT_METALLIB; format_ext = ".metallib"; }
 	else if (have & SDL_GPU_SHADERFORMAT_MSL) { format = SDL_GPU_SHADERFORMAT_MSL; format_ext = ".msl"; }
+	// Phones: the game is 16:9 only. SDL's Android code overrides the manifest's orientation for a resizable window, so ask it here.
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 	window = SDL_CreateWindow(title, width, height, SDL_WINDOW_RESIZABLE);
 	if (!window || !SDL_ClaimWindowForGPUDevice(device, window)) {
 		if (error) *error = SDL_GetError();
