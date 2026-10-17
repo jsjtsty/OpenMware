@@ -30,6 +30,7 @@ struct Sprite {
 	// source
 	std::string file;
 	Texture* texture = nullptr;
+	std::shared_ptr<Texture> texture_hold; // keeps a cached picture alive while this sprite shows it (null for surfaces)
 	int sub_x = 0, sub_y = 0, sub_w = -1, sub_h = -1; // sub-rectangle of the image (-1: whole)
 	float width = 0, height = 0;
 
@@ -59,6 +60,7 @@ struct Sprite {
 	float trans_rate = 0.3f;
 	std::string trans_file;
 	Texture* trans_tex = nullptr;
+	std::shared_ptr<Texture> trans_hold;
 	bool clickable = false, check_alpha = false; // SetClickable: takes part in mouse hit testing
 	// SQSpriteRenderTarget: `texture` is an offscreen surface (w x h) that the sprites assigned to it are drawn into;
 	// a capture target instead copies what has been drawn below it (shake / filter sprites), while `capturing`.

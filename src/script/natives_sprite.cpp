@@ -18,6 +18,7 @@ SpriteRef::~SpriteRef() {
 	if (aux) { // the movie state's tick hook points into it
 		sprite->tick = nullptr;
 		sprite->texture = nullptr;
+		sprite->texture_hold.reset();
 	}
 	ScriptHost* h = ScriptHost::current();
 	if ((sprite->is_target || sprite->is_capture) && sprite->texture) { // the surface belongs to the renderer
@@ -68,7 +69,8 @@ void init_image(Sprite* s, const std::string& file, int x, int y, int w, int h) 
 	s->sub_y = y < 0 ? 0 : y;
 	s->sub_w = w;
 	s->sub_h = h;
-	s->texture = host().renderer ? host().renderer->texture(file) : nullptr;
+	s->texture_hold = host().renderer ? host().renderer->texture(file) : nullptr;
+	s->texture = s->texture_hold.get();
 	if (s->texture) {
 		s->width = static_cast<float>(w > 0 ? w : s->texture->w - s->sub_x);
 		s->height = static_cast<float>(h > 0 ? h : s->texture->h - s->sub_y);
@@ -381,7 +383,8 @@ SQInteger transition(HSQUIRRELVM v) {
 	const std::string file = arg_string(v, 5);
 	s->trans_file = file;
 	s->trans_on = !file.empty();
-	s->trans_tex = s->trans_on && host().renderer ? host().renderer->texture(file) : nullptr;
+	s->trans_hold = s->trans_on && host().renderer ? host().renderer->texture(file) : nullptr;
+	s->trans_tex = s->trans_hold.get();
 	s->trans_rate = arg_float(v, 4);
 	s->trans.set({arg_float(v, 2)});
 	s->trans.start({arg_float(v, 3)}, arg_float(v, 6), static_cast<int>(arg_int(v, 7)));

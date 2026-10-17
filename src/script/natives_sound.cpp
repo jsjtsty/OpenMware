@@ -3,6 +3,7 @@
 #include "game/game_files.h"
 #include "script/bind.h"
 #include "script/host.h"
+#include "util/shared_cache.h"
 
 #include <cstdio>
 #include <map>
@@ -33,27 +34,22 @@ SQInteger ret_null(HSQUIRRELVM) { return 0; }
 SQInteger ret_zero_f(HSQUIRRELVM v) { sq_pushfloat(v, 0.f); return 1; }
 SQInteger ret_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
 
-// Decoded files by archive path. Small files (effects, voice lines) stay resident; long ones (music) live only while a voice
-// plays them.
-struct Cached {
-	std::weak_ptr<const Pcm> weak;
-	std::shared_ptr<const Pcm> strong;
-};
-std::map<std::string, Cached>& cache() {
-	static std::map<std::string, Cached> c;
+// Decoded files by archive path. Every voice using a file shares one decode. Short files (effects, voice lines) are also kept
+// while idle, least recently used first, within a 64 MB budget; long ones (music) live only while a voice plays them.
+SharedCache<const Pcm>& cache() {
+	static SharedCache<const Pcm> c(64u << 20);
 	return c;
 }
 
 std::shared_ptr<const Pcm> load_pcm(const std::string& path) {
 	ScriptHost& h = host();
-	Cached& c = cache()[path];
-	if (auto p = c.weak.lock()) return p;
+	if (auto p = cache().find(path)) return p;
 	std::vector<uint8_t> data;
 	if (!h.files || !h.files->read(path, data)) return nullptr;
 	auto pcm = decode_ogg(data);
 	if (!pcm) return nullptr;
-	c.weak = pcm;
-	if (pcm->data.size() * sizeof(int16_t) < (6u << 20)) c.strong = pcm;
+	const size_t bytes = pcm->data.size() * sizeof(int16_t);
+	cache().insert(path, pcm, bytes, bytes < (6u << 20));
 	return pcm;
 }
 

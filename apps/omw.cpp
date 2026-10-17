@@ -128,7 +128,8 @@ int main(int argc, char** argv) {
 	// Fixed-timestep loop: the game logic always advances in 1/60 s steps; rendering runs at the display's rate. A time accumulator
 	// decides how many logic steps are due per presented frame (none on a 144 Hz display half the time, several after a stall).
 	const bool realtime = frames < 0 && shot.empty() && shots_at.empty();
-	const bool render_all = std::getenv("OMW_RENDER_ALL") != nullptr; // headless runs normally skip drawing; effects that read the screen need it
+	const bool mem_stats = std::getenv("OMW_MEMSTATS") != nullptr; // prints cache/stage occupancy every 3000 frames
+	const bool render_all =std::getenv("OMW_RENDER_ALL") != nullptr; // headless runs normally skip drawing; effects that read the screen need it
 	const Uint64 step_ns = 1000000000ull / 60;
 	Uint64 last_ns = SDL_GetTicksNS(), acc_ns = step_ns;
 	int catch_up = 0;
@@ -174,6 +175,11 @@ int main(int argc, char** argv) {
 		}
 		stage.update(1000.f / 60.f);
 		audio.update(1000.f / 60.f);
+		if (mem_stats && frame % 3000 == 0) {
+			const auto cs = renderer.cache_stats();
+			std::printf("[mem] frame %d: sprites %zu, textures kept %zu (%zu MB) of %zu keys, dynamic %zu\n", frame, stage.size(), cs.kept,
+						cs.kept_bytes >> 20, cs.keys, cs.dynamic);
+		}
 		items.clear();
 		stage.build_draw_list(items);
 		for (const auto& [f, path] : shots_at)

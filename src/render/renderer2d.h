@@ -6,11 +6,13 @@
 #include "game/texture.h"
 #include "render/gpu.h"
 #include "render/text_raster.h"
+#include "util/shared_cache.h"
 
 #include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace omw {
@@ -20,9 +22,14 @@ public:
 	bool init(GpuContext& gpu, const GameFiles& files, std::string* error);
 	void shutdown();
 
-	// Cached texture from an archive path (webp/png/jpg); nullptr when it cannot be loaded.
-	Texture* texture(const std::string& path);
+	// Texture from an archive path (webp/png/jpg), shared and cached; empty when it cannot be loaded. The caller keeps the
+	// returned reference for as long as it uses the picture: idle pictures are evicted (least recently used first) once
+	// they exceed the cache budget, pictures still referenced are never freed.
+	std::shared_ptr<Texture> texture(const std::string& path);
 	Texture* white() { return &white_; }
+	// Picture cache occupancy (diagnostics): idle-retained pictures and their bytes, all known keys, dynamic textures.
+	struct CacheStats { size_t kept, kept_bytes, keys, dynamic; };
+	CacheStats cache_stats() const { return {textures_.retained_count(), textures_.retained_bytes(), textures_.indexed_count(), dynamic_.size()}; }
 
 	// Textures generated at run time (text bitmaps). The renderer owns them; `replace` swaps the pixels and size in place.
 	Texture* create_dynamic_texture(int w, int h, const uint8_t* rgba);
@@ -80,7 +87,11 @@ private:
 	Texture white_;
 	std::vector<std::unique_ptr<Texture>> dynamic_;
 	FontLibrary fonts_;
-	std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
+	// Picture cache: ~5 bytes per pixel (RGBA on the GPU plus the CPU alpha mask), 256 MB of idle pictures.
+	SharedCache<Texture> textures_{256u << 20};
+	// Cell the textures' deleters read the device from; emptied at shutdown so late releases do nothing.
+	std::shared_ptr<SDL_GPUDevice*> device_cell_ = std::make_shared<SDL_GPUDevice*>(nullptr);
+	std::unordered_set<std::string> missing_; // archive paths that failed to load (reported once)
 	std::unordered_map<std::string, long long> disk_stamp_; // file:/// textures: modification time they were loaded at
 	std::map<std::pair<int, std::string>, SDL_GPUGraphicsPipeline*> pipelines_; // key: blend | flags << 8
 	std::map<std::string, SDL_GPUShader*> shaders_;

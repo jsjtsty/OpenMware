@@ -64,6 +64,7 @@ float clamp01(float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
 
 bool Renderer2D::init(GpuContext& gpu, const GameFiles& files, std::string* error) {
 	gpu_ = &gpu;
+	*device_cell_ = gpu.device;
 	files_ = &files;
 	vs_ = gpu.load_shader("vssprite.vert", SDL_GPU_SHADERSTAGE_VERTEX, 0, 1);
 	if (!vs_) {
@@ -187,7 +188,13 @@ void Renderer2D::shutdown() {
 	for (auto& p : fx_pipes_) if (p) SDL_ReleaseGPUGraphicsPipeline(gpu_->device, p);
 	temps_.clear();
 	for (auto& [k, s] : shaders_) if (s) SDL_ReleaseGPUShader(gpu_->device, s);
-	for (auto& [k, t] : textures_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+	// Pictures still held by sprites give their GPU memory back now; their deleters then find no device.
+	textures_.for_each_live([this](const std::shared_ptr<Texture>& t) {
+		if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
+		t->gpu = nullptr;
+	});
+	textures_.clear();
+	*device_cell_ = nullptr;
 	for (auto& t : dynamic_) if (t->gpu) SDL_ReleaseGPUTexture(gpu_->device, t->gpu);
 	dynamic_.clear();
 	if (white_.gpu) SDL_ReleaseGPUTexture(gpu_->device, white_.gpu);
@@ -207,7 +214,6 @@ void Renderer2D::shutdown() {
 	if (vs_) SDL_ReleaseGPUShader(gpu_->device, vs_);
 	pipelines_.clear();
 	shaders_.clear();
-	textures_.clear();
 }
 
 Texture* Renderer2D::create_dynamic_texture(int w, int h, const uint8_t* rgba) {
@@ -248,7 +254,7 @@ bool read_disk_file(const std::string& path, std::vector<uint8_t>& out, long lon
 }
 } // namespace
 
-Texture* Renderer2D::texture(const std::string& path) {
+std::shared_ptr<Texture> Renderer2D::texture(const std::string& path) {
 	std::string key = path;
 	for (char& c : key) {
 		if (c == '\\') c = '/';
@@ -257,38 +263,45 @@ Texture* Renderer2D::texture(const std::string& path) {
 	// "file:///dir/name": a picture on disk (save-file thumbnails), reloaded in place when the file changes.
 	const bool on_disk = key.rfind("file:///", 0) == 0;
 	const std::string disk_path = on_disk ? path.substr(8) : std::string();
-	auto it = textures_.find(key);
-	if (it != textures_.end()) {
-		if (!on_disk) return it->second->gpu ? it->second.get() : nullptr;
+	if (!on_disk && missing_.count(key)) return nullptr;
+	std::shared_ptr<Texture> tex = textures_.find(key);
+	if (tex && tex->gpu) {
+		if (!on_disk) return tex;
 		std::error_code ec;
 		const auto t = std::filesystem::last_write_time(std::filesystem::u8path(disk_path), ec);
-		if (!ec && static_cast<long long>(t.time_since_epoch().count()) == disk_stamp_[key]) return it->second->gpu ? it->second.get() : nullptr;
+		if (!ec && static_cast<long long>(t.time_since_epoch().count()) == disk_stamp_[key]) return tex;
 	}
 	std::vector<uint8_t> file;
 	Image img;
 	long long stamp = 0;
 	const bool loaded = on_disk ? read_disk_file(disk_path, file, &stamp) && decode_image(file, img) : files_->read(path, file) && decode_image(file, img);
-	Texture* raw;
-	if (it != textures_.end()) {
-		raw = it->second.get();
-		if (raw->gpu) SDL_ReleaseGPUTexture(gpu_->device, raw->gpu);
-		raw->gpu = nullptr;
-	} else {
-		auto tex = std::make_unique<Texture>();
-		raw = tex.get();
-		textures_[key] = std::move(tex);
+	if (!loaded) {
+		if (!on_disk && missing_.insert(key).second) std::fprintf(stderr, "[texture] cannot load %s\n", path.c_str());
+		return tex && tex->gpu ? tex : nullptr; // a changed file that no longer decodes keeps the old picture
 	}
-	if (loaded) {
-		raw->gpu = gpu_->create_texture_rgba8(img.w, img.h, img.rgba.data());
-		raw->w = img.w;
-		raw->h = img.h;
-		raw->alpha.resize(static_cast<size_t>(img.w) * img.h);
-		for (size_t i = 0; i < raw->alpha.size(); i++) raw->alpha[i] = img.rgba[i * 4 + 3];
-		if (on_disk) disk_stamp_[key] = stamp;
-	} else if (!on_disk) {
-		std::fprintf(stderr, "[texture] cannot load %s\n", path.c_str());
+	const bool fresh = !tex;
+	if (fresh) {
+		// The deleter returns the GPU memory when the last user lets go (unless the renderer is already gone).
+		tex = std::shared_ptr<Texture>(new Texture, [cell = device_cell_](Texture* t) {
+			if (t->gpu && *cell) SDL_ReleaseGPUTexture(*cell, t->gpu);
+			delete t;
+		});
+	} else if (tex->gpu) { // reloaded in place so that sprites holding it see the new picture
+		SDL_ReleaseGPUTexture(gpu_->device, tex->gpu);
+		tex->gpu = nullptr;
 	}
-	return raw->gpu ? raw : nullptr;
+	tex->gpu = gpu_->create_texture_rgba8(img.w, img.h, img.rgba.data());
+	if (!tex->gpu) return nullptr;
+	tex->w = img.w;
+	tex->h = img.h;
+	tex->alpha.resize(static_cast<size_t>(img.w) * img.h);
+	for (size_t i = 0; i < tex->alpha.size(); i++) tex->alpha[i] = img.rgba[i * 4 + 3];
+	if (on_disk) disk_stamp_[key] = stamp;
+	const size_t bytes = static_cast<size_t>(img.w) * img.h * 5;
+	// A single picture above the budget is shared while in use but not kept idle.
+	if (fresh) textures_.insert(key, tex, bytes, bytes <= (64u << 20));
+	else textures_.resize(key, bytes);
+	return tex;
 }
 
 SDL_GPUGraphicsPipeline* Renderer2D::pipeline(int blend, const std::string& ps_name, Uint32 samplers, bool to_target, bool premult) {
