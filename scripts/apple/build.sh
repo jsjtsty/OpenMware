@@ -44,6 +44,8 @@ cp "$build"/ffmpeg-install/licenses/* "$stage/licenses/"
 cp "$root/docs/third-party.md" "$stage/licenses/THIRD-PARTY.md"
 if [ "$platform" = macos ]; then cp "$build/openmware-player" "$stage/player/"; fi
 
+# XcodeGen checks the folders of both targets, even when only one platform is built.
+for p in macos ios; do mkdir -p "$apple/Staging/$p"/{ffmpeg,player,shaders,licenses}; done
 ( cd "$apple" && xcodegen generate )
 
 if [ "$platform" = macos ]; then

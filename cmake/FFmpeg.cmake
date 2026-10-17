@@ -86,6 +86,9 @@ elseif(IOS)
 	if(OMW_FFMPEG_SHARED)
 		list(APPEND _ff_args --install-name-dir=@rpath)
 	endif()
+	# FFmpeg builds helper programs for the host while it runs. Under Xcode the environment says "iphoneos", which would make
+	# the host compiler produce iOS binaries that the Mac kills when they run (make: Error 137); point the host at macOS.
+	set(_ff_pre "unset IPHONEOS_DEPLOYMENT_TARGET; export SDKROOT=\"$(xcrun --sdk macosx --show-sdk-path)\"")
 elseif(APPLE)
 	execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE _mac_sdk OUTPUT_STRIP_TRAILING_WHITESPACE)
 	set(_mac_flags "-arch ${_ff_cpu} -isysroot ${_mac_sdk}")
@@ -169,6 +172,7 @@ if [ ! -f config.h ]; then
 fi
 make -j\"\$(nproc 2>/dev/null || sysctl -n hw.ncpu)\" ${_ff_make_vars}
 make install ${_ff_make_vars}
+ls '${_ff_prefix_sh}/lib' '${_ff_prefix_sh}/bin' 2>&1 | head -40
 mkdir -p '${_ff_prefix_sh}/licenses'
 cp \"\$1\"/COPYING.LGPLv2.1 \"\$1\"/LICENSE.md '${_ff_prefix_sh}/licenses/'
 ")
