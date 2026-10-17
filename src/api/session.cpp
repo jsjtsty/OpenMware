@@ -135,7 +135,7 @@ int run_session(const RunOptions& opt, std::string* error) {
 				SDL_Event ev{};
 				ev.type = frame == c.frame ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_UP;
 				ev.tfinger.touchID = 1;
-				ev.tfinger.fingerID = 1;
+				ev.tfinger.fingerID = 1 + (&c - opt.touch_cmds.data()); // each --touch is its own finger
 				ev.tfinger.x = ((ww - Stage::kWidth * s) * 0.5f + c.x * s) / ww;
 				ev.tfinger.y = ((wh - Stage::kHeight * s) * 0.5f + c.y * s) / wh;
 				SDL_PushEvent(&ev);

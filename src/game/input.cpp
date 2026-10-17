@@ -193,6 +193,21 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 			const float gy = std::clamp((e.tfinger.y * wh - (wh - game_h * scale) * 0.5f) / scale, 0.f, static_cast<float>(game_h));
 			auto it = std::find_if(touches.begin(), touches.end(), [&](const Touch& t) { return t.id == e.tfinger.fingerID && t.state != 3 && !t.pending_up; });
 			if (e.type == SDL_EVENT_FINGER_DOWN) {
+				const bool second = std::any_of(touches.begin(), touches.end(), [](const Touch& o) { return o.state != 3; });
+				if (second) {
+					// A second finger is a right click. The first finger's own (emulated) left click is dropped, and neither finger
+					// counts as a gesture for the scripts (no long press on top of it).
+					for (auto& o : touches) o.hidden = true;
+					mouse_down[0] = false;
+					swallow_touch_mouse_ = true;
+					mouse_down[1] = mouse_pressed[1] = true;
+					mouse_tap_[1] = 1; // released on the next frame
+					Touch t;
+					t.id = e.tfinger.fingerID;
+					t.hidden = true;
+					touches.push_back(t);
+					break;
+				}
 				Touch t;
 				t.id = e.tfinger.fingerID;
 				t.x = t.start_x = gx;

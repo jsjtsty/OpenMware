@@ -15,6 +15,7 @@ The game's own scripts already contain the phone controls; the engine feeds them
 
 * **Tap**: click (SDL turns a tap into a left click): advance the text, press buttons, pick a choice.
 * **Press and hold (about 0.5 s, finger not moving)**: open the system menu (the right-click menu on a PC); do the same to close it. The menu has skip, auto, backlog, save/load and config.
+* **Two-finger tap** (a second finger touching while one is down): right click, which opens the system menu at once and closes it again.
 * **Android back button**: Esc (asks whether to quit).
 
-Test without a device: `openmware-player ... --touch FRAME:X:Y:FRAMES` holds a finger at game position (X, Y) for FRAMES frames.
+Test without a device: `openmware-player ... --touch FRAME:X:Y:FRAMES` (repeatable, each one is its own finger) holds a finger at game position (X, Y) for FRAMES frames.
