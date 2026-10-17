@@ -342,10 +342,10 @@ SQInteger set_clickable(HSQUIRRELVM v) { // (clickable, check_alpha)
 	return 0;
 }
 // Mouse queries: the stage resolves the topmost clickable sprite under the cursor once per frame.
-bool is_hot(HSQUIRRELVM v) { return host().stage && host().stage->hot() == spr(v); }
+bool is_hot(HSQUIRRELVM v) { return host().stage && host().stage->is_hit(spr(v)); }
 SQInteger is_over(HSQUIRRELVM v) { // (trigger): trigger != 0 -> only on the frame the cursor enters
 	bool on = is_hot(v);
-	if (on && arg_int(v, 2) != 0) on = host().stage->previous_hot() != spr(v);
+	if (on && arg_int(v, 2) != 0) on = !host().stage->was_hit(spr(v));
 	sq_pushbool(v, on);
 	return 1;
 }

@@ -1,6 +1,8 @@
 // The 2D stage: every live sprite of the script world, its animated properties, and the draw list for a frame.
 #pragma once
 
+#include <algorithm>
+
 #include "game/anim.h"
 #include "render/blend.h"
 
@@ -183,6 +185,10 @@ public:
 	void update_pointer(float x, float y);
 	const Sprite* hot() const { return hot_; }
 	const Sprite* previous_hot() const { return prev_hot_; }
+	// Every clickable sprite under the cursor at the top priority counts as hit: overlapping buttons of equal priority (a
+	// popup menu over a save slot) both see the cursor, and the scripts decide which one is active.
+	bool is_hit(const Sprite* s) const { return s && std::find(hits_.begin(), hits_.end(), s) != hits_.end(); }
+	bool was_hit(const Sprite* s) const { return s && std::find(prev_hits_.begin(), prev_hits_.end(), s) != prev_hits_.end(); }
 	size_t size() const { return sprites_.size(); }
 	void dump() const; // one line per sprite on stdout (debugging)
 
@@ -191,6 +197,7 @@ private:
 	uint64_t next_order_ = 0;
 	const Sprite* hot_ = nullptr;
 	const Sprite* prev_hot_ = nullptr;
+	std::vector<const Sprite*> hits_, prev_hits_;
 };
 
 } // namespace omw

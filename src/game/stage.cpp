@@ -383,10 +383,17 @@ bool sprite_hit(const Sprite& s, float x, float y) {
 void Stage::update_pointer(float x, float y) {
 	prev_hot_ = hot_;
 	hot_ = nullptr;
+	prev_hits_.swap(hits_);
+	hits_.clear();
 	for (const auto& sp : sprites_) {
 		const Sprite* s = sp.get();
 		if (!s->clickable || s->released || !sprite_hit(*s, x, y)) continue;
 		if (!hot_ || s->priority > hot_->priority || (s->priority == hot_->priority && s->order > hot_->order)) hot_ = s;
+	}
+	if (!hot_) return;
+	for (const auto& sp : sprites_) {
+		const Sprite* s = sp.get();
+		if (s->clickable && !s->released && s->priority == hot_->priority && sprite_hit(*s, x, y)) hits_.push_back(s);
 	}
 }
 
