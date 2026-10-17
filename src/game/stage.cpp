@@ -152,11 +152,12 @@ DrawItem make_item(const Sprite* s, const Sprite::Pose* pose = nullptr) {
 		d.rw = s->sub_w > 0 ? static_cast<float>(s->sub_w) : s->width;
 		d.rh = s->sub_h > 0 ? static_cast<float>(s->sub_h) : s->height;
 	} else if (s->is_capture && s->capturing) {
-		d.snap = DrawItem::Snap::Capture;
-		s->drawn_capturing = true;
-		if (s->freeze_after_draw) {
+		if (s->freeze_after_draw && s->texture && s->texture->copies > 0) { // stopped and a picture has been taken: freeze now
 			s->freeze_after_draw = false;
-			const_cast<Sprite*>(s)->capturing = false; // this frame still takes the picture
+			const_cast<Sprite*>(s)->capturing = false;
+		} else {
+			d.snap = DrawItem::Snap::Capture;
+			s->drawn_capturing = true;
 		}
 	}
 	d.premult = s->is_target && !s->is_capture;

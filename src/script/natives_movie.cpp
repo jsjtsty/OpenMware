@@ -2,6 +2,7 @@
 // dynamic texture shown by the sprite; the audio track plays as a voice of the audio engine.
 #include "audio/audio.h"
 #include "game/game_files.h"
+#include "game/texture.h"
 #include "render/renderer2d.h"
 #include "script/bind.h"
 #include "script/host.h"
@@ -132,8 +133,8 @@ bool screen_snapshot(HSQUIRRELVM v, bool follow) {
 	if (follow) {
 		s->capturing = true;
 		s->freeze_after_draw = false;
-	} else if (s->capturing && !s->drawn_capturing) {
-		s->freeze_after_draw = true; // nothing has been captured yet: let one frame through first
+	} else if (s->capturing && !(s->texture && s->texture->copies > 0)) {
+		s->freeze_after_draw = true; // nothing has been captured yet: freeze after the renderer has taken the first picture
 	} else {
 		s->capturing = false;
 	}

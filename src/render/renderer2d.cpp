@@ -571,8 +571,10 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 					end_pass();
 				}
 				if (reads_dest || snap_screen) copy_texture(target, sc.dest, tw, th);
-				if (snap_capture && it.texture && it.texture->gpu)
+				if (snap_capture && it.texture && it.texture->gpu) {
 					copy_texture(target, it.texture->gpu, std::min(tw, it.texture->w), std::min(th, it.texture->h));
+					it.texture->copies++;
+				}
 				begin_pass(target, false, 1.f);
 			}
 
@@ -604,6 +606,9 @@ bool Renderer2D::render_frame(const DrawList& list) {
 	SDL_GPUTexture* swap = nullptr;
 	Uint32 sw = 0, sh = 0;
 	if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, gpu_->window, &swap, &sw, &sh) || !swap) {
+		// Nothing to present this time (the window is hidden or the drawable is busy, common on macOS); the frame is still
+		// drawn so that screen captures and offscreen surfaces get their pictures.
+		draw_passes(cmd, list);
 		SDL_SubmitGPUCommandBuffer(cmd);
 		return false;
 	}

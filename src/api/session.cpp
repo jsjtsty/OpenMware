@@ -4,6 +4,7 @@
 #include "game/game_files.h"
 #include "game/input.h"
 #include "game/stage.h"
+#include "game/texture.h"
 #include "render/gpu.h"
 #include "render/renderer2d.h"
 #include "script/host.h"
@@ -147,6 +148,10 @@ int run_session(const RunOptions& opt, std::string* error) {
 			}
 			items.clear();
 			stage.build_draw_list(items);
+			// A screen capture that has no picture yet is taken by the renderer, so this frame is drawn even when behind.
+			for (const RenderPass& p : items)
+				for (const DrawItem& d : p.items)
+					if (d.snap == DrawItem::Snap::Capture && d.texture && d.texture->copies == 0) present = true;
 			for (const auto& [f, path] : opt.shots_at)
 				if (f == frame) renderer.save_frame_png(items, path);
 			const bool last = opt.frames >= 0 && frame == opt.frames - 1;
