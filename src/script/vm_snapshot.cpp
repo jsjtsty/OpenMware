@@ -560,12 +560,13 @@ struct Writer {
 	}
 
 	// --- whole snapshot -------------------------------------------------------------------------------------------
-	// Root entries that a load must leave alone: classes, functions, user data, the ignore list, and anything that was
-	// not collected (it would come back as null and clobber the live value).
+	// Root entries that a load must leave alone: classes, natives, user data, the ignore list, and anything that was
+	// not collected (it would come back as null and clobber the live value). Script closures are kept: each story file
+	// puts its main/scene/endfile into the root table, and a frame restored inside scene() calls endfile() from there.
 	bool is_skipped_root_value(const SQObjectPtr& v) const {
 		switch (type(v)) {
-		case OT_CLASS: case OT_NATIVECLOSURE: case OT_CLOSURE: case OT_USERDATA: case OT_USERPOINTER: case OT_FUNCPROTO: return true;
-		case OT_TABLE: case OT_ARRAY: case OT_INSTANCE: case OT_THREAD: case OT_GENERATOR:
+		case OT_CLASS: case OT_NATIVECLOSURE: case OT_USERDATA: case OT_USERPOINTER: case OT_FUNCPROTO: return true;
+		case OT_TABLE: case OT_ARRAY: case OT_INSTANCE: case OT_THREAD: case OT_GENERATOR: case OT_CLOSURE:
 			if (type(v) == OT_TABLE && _table(v) == root) return true;
 			return id_of.count(raw_of(v)) == 0;
 		default: return false;
@@ -588,7 +589,7 @@ struct Writer {
 				ref = n;
 				if (type(k) != OT_STRING) continue;
 				switch (type(val)) {
-				case OT_CLASS: case OT_NATIVECLOSURE: case OT_CLOSURE: case OT_USERDATA: case OT_USERPOINTER: case OT_FUNCPROTO: continue;
+				case OT_CLASS: case OT_NATIVECLOSURE: case OT_USERDATA: case OT_USERPOINTER: case OT_FUNCPROTO: continue;
 				default: break;
 				}
 				if (ISREFCOUNTED(type(val)) && ignored.count(raw_of(val))) continue;
