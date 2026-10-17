@@ -59,6 +59,10 @@
 "detail_clear_saves" = "删除存档";
 "detail_remove" = "移除游戏";
 "detail_rename" = "重命名";
+"detail_section_info" = "详情";
+"detail_section_manage" = "管理";
+"detail_section_danger" = "删除";
+"select_game" = "选择一个游戏";
 "confirm_clear_saves" = "删除“%@”的全部存档？此操作无法撤销。";
 "confirm_remove" = "从游戏库移除“%@”？复制的文件和存档会被删除；链接的原文件夹不受影响。";
 "verify_ok" = "一切正常：已用密钥打开 %d 个档案。";

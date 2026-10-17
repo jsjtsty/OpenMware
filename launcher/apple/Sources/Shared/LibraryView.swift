@@ -52,7 +52,7 @@ struct LibraryView: View {
     }
 }
 
-private struct EmptyLibrary: View {
+struct EmptyLibrary: View {
     let onAdd: () -> Void
 
     var body: some View {

@@ -6,14 +6,18 @@ struct OpenMwareApp: App {
 
     var body: some Scene {
         WindowGroup {
+            #if os(macOS)
+            MacLibraryView()
+                .environmentObject(store)
+                .frame(minWidth: 760, minHeight: 520)
+            #else
             LibraryView()
                 .environmentObject(store)
-                #if os(macOS)
-                .frame(minWidth: 640, minHeight: 460)
-                #endif
+            #endif
         }
         #if os(macOS)
-        .defaultSize(width: 900, height: 620)
+        .windowToolbarStyle(.unified)
+        .defaultSize(width: 980, height: 660)
         .commands {
             CommandGroup(replacing: .newItem) {}
         }

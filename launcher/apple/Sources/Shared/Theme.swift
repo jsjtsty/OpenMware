@@ -4,6 +4,7 @@ import SwiftUI
 struct CoverView: View {
     let game: Game
     var letterSize: CGFloat = 48
+    var showsLetter = true
 
     var body: some View {
         let h = game.coverHue
@@ -14,9 +15,29 @@ struct CoverView: View {
                     Color(hue: (h + 0.11).truncatingRemainder(dividingBy: 1), saturation: 0.55, brightness: 0.58),
                 ],
                 startPoint: .topLeading, endPoint: .bottomTrailing)
-            Text(String(game.name.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased())
-                .font(.system(size: letterSize, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.92))
+            if showsLetter {
+                Text(String(game.name.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased())
+                    .font(.system(size: letterSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+            }
+        }
+    }
+}
+
+extension GameStatus {
+    var label: String {
+        switch self {
+        case .ready: return L("status_ready")
+        case .keysMissing: return L("status_keys_missing")
+        case .incomplete: return L("status_incomplete")
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ready: return .green
+        case .keysMissing: return .orange
+        case .incomplete: return .red
         }
     }
 }
@@ -25,13 +46,7 @@ struct StatusBadge: View {
     let status: GameStatus
 
     var body: some View {
-        let (text, color): (String, Color) = {
-            switch status {
-            case .ready: return (L("status_ready"), .green)
-            case .keysMissing: return (L("status_keys_missing"), .orange)
-            case .incomplete: return (L("status_incomplete"), .red)
-            }
-        }()
+        let text = status.label, color = status.color
         Text(text)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 8)

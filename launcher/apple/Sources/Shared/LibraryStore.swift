@@ -264,9 +264,16 @@ final class LibraryStore: ObservableObject {
                 self.player = nil
                 self.playing = nil
                 self.addPlayTime(game.id, Date().timeIntervalSince(started))
+                NSApp.unhide(nil)
+                NSApp.activate(ignoringOtherApps: true)
                 if status != 0 && status != 15 { // 15: stopped from the launcher
                     self.lastError = L("error_player_exit", Int(status)) + "\n" + ((try? String(contentsOf: log, encoding: .utf8))?.suffix(400).description ?? "")
                 }
+            }
+            // The launcher steps aside while the game runs and comes back when it ends (above). The short wait lets the
+            // game's window appear first, and skips hiding when it fails at once.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                if self?.playing == game.id { NSApp.hide(nil) }
             }
         } catch {
             access.stop()

@@ -31,8 +31,128 @@ struct DetailView: View {
         }
     }
 
-    @ViewBuilder
     private func content(_ game: Game) -> some View {
+        layout(game)
+        #if os(iOS)
+        .navigationTitle(game.name)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { newName = game.name; showRename = true } label: { Label(L("detail_rename"), systemImage: "pencil") }
+            }
+        }
+        .alert(L("detail_rename"), isPresented: $showRename) {
+            TextField(L("add_name_label"), text: $newName)
+            Button(L("save")) { store.rename(game, to: newName) }
+            Button(L("cancel"), role: .cancel) {}
+        }
+        .confirmationDialog(L("confirm_clear_saves", game.name), isPresented: $confirmClear, titleVisibility: .visible) {
+            Button(L("detail_clear_saves"), role: .destructive) { store.clearSaves(game); refresh += 1 }
+        }
+        .confirmationDialog(L("confirm_remove", game.name), isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button(L("detail_remove"), role: .destructive) { store.remove(game) }
+        }
+        .fileImporter(isPresented: $pickKeys, allowedContentTypes: [.plainText, .data]) { result in
+            guard case .success(let url) = result else { return }
+            let count = store.setKeys(game, text: store.readText(url))
+            verifyMessage = count > 0 ? L("add_keys_ok", count) : L("add_keys_invalid")
+            refresh += 1
+        }
+    }
+
+    #if os(macOS)
+    /// macOS: a banner with the cover and the play button, the facts as tiles, then the actions on cards.
+    @ViewBuilder
+    private func layout(_ game: Game) -> some View {
+        let status = store.status(game)
+        let (archiveCount, gameBytes) = store.gameBytes(game)
+        let saveBytes = store.saveBytes(game)
+        let keyCount = store.keyCount(game)
+        let isPlaying = store.playing == game.id
+        let _ = refresh
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                GameHero(game: game, status: status) {
+                    if isPlaying {
+                        Button { store.stop() } label: { Label(L("stop"), systemImage: "stop.fill") }
+                            .buttonStyle(HeroButtonStyle(prominent: false))
+                    } else {
+                        Button { store.play(game) } label: { Label(L("play"), systemImage: "play.fill") }
+                            .buttonStyle(HeroButtonStyle())
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(status != .ready || store.playing != nil)
+                    }
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([store.folder(game)]) } label: { Label(L("detail_reveal"), systemImage: "folder") }
+                        .buttonStyle(HeroButtonStyle(prominent: false))
+                }
+
+                switch status {
+                case .keysMissing:
+                    notice(L("cannot_play_keys"), icon: "key.slash", color: .orange)
+                case .incomplete:
+                    notice(L("cannot_play_incomplete"), icon: "exclamationmark.triangle.fill", color: .red)
+                case .ready:
+                    EmptyView()
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("detail_section_info")).font(.headline).padding(.leading, 4)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 12)], spacing: 12) {
+                        StatTile(icon: "clock", title: L("detail_play_time"), value: game.playSeconds > 0 ? formatDuration(game.playSeconds) : L("never_played"))
+                        StatTile(icon: "internaldrive", title: L("detail_size"), value: formatBytes(gameBytes))
+                        StatTile(icon: "shippingbox", title: L("detail_archives"), value: "\(archiveCount)")
+                        StatTile(icon: game.storage == .copied ? "square.on.square" : "link",
+                                 title: L("detail_storage"), value: L(game.storage == .copied ? "storage_copied" : "storage_linked"))
+                        StatTile(icon: "tray.full", title: L("detail_save_size"), value: saveBytes > 0 ? formatBytes(saveBytes) : L("detail_no_saves"))
+                        StatTile(icon: "key", title: L("detail_keys"), value: keyCount > 0 ? L("add_keys_ok", keyCount) : L("add_keys_invalid"))
+                    }
+                }
+
+                CardSection(title: L("detail_section_manage")) {
+                    ActionRow(icon: "checkmark.shield", title: L("detail_verify"), busy: verifying) { verify(game) }
+                        .disabled(verifying || status == .incomplete)
+                    if let verifyMessage {
+                        Text(verifyMessage)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 44)
+                            .padding(.bottom, 10)
+                    }
+                    Divider().padding(.leading, 44)
+                    ActionRow(icon: "key", title: L("detail_keys_replace")) { pickKeys = true }
+                    Divider().padding(.leading, 44)
+                    ActionRow(icon: "square.and.arrow.up", title: L("detail_export_saves")) { exportSaves(game) }
+                        .disabled(saveBytes == 0)
+                }
+
+                CardSection(title: L("detail_section_danger")) {
+                    ActionRow(icon: "trash", title: L("detail_clear_saves"), destructive: true) { confirmClear = true }
+                        .disabled(saveBytes == 0)
+                    Divider().padding(.leading, 44)
+                    ActionRow(icon: "xmark.bin", title: L("detail_remove"), destructive: true) { confirmRemove = true }
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 860)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func notice(_ text: String, icon: String, color: Color) -> some View {
+        Label(text, systemImage: icon)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(color)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+    #else
+    @ViewBuilder
+    private func layout(_ game: Game) -> some View {
         let status = store.status(game)
         let (archiveCount, gameBytes) = store.gameBytes(game)
         let saveBytes = store.saveBytes(game)
@@ -47,12 +167,7 @@ struct DetailView: View {
                         .frame(height: 170)
                         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     if isPlaying {
-                        #if os(macOS)
-                        Button(role: .destructive) { store.stop() } label: { Label(L("stop"), systemImage: "stop.fill").frame(maxWidth: .infinity) }
-                            .controlSize(.large)
-                        #else
                         Label(L("playing"), systemImage: "play.fill").frame(maxWidth: .infinity)
-                        #endif
                     } else {
                         Button { store.play(game) } label: { Label(L("play"), systemImage: "play.fill").frame(maxWidth: .infinity) }
                             .buttonStyle(.borderedProminent)
@@ -92,9 +207,6 @@ struct DetailView: View {
                 Button { pickKeys = true } label: { Label(L("detail_keys_replace"), systemImage: "key") }
                 Button { exportSaves(game) } label: { Label(L("detail_export_saves"), systemImage: "square.and.arrow.up") }
                     .disabled(saveBytes == 0)
-                #if os(macOS)
-                Button { NSWorkspace.shared.activateFileViewerSelecting([store.folder(game)]) } label: { Label(L("detail_reveal"), systemImage: "folder") }
-                #endif
             }
 
             Section {
@@ -103,33 +215,8 @@ struct DetailView: View {
                 Button(role: .destructive) { confirmRemove = true } label: { Label(L("detail_remove"), systemImage: "trash.fill") }
             }
         }
-        .navigationTitle(game.name)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { newName = game.name; showRename = true } label: { Label(L("detail_rename"), systemImage: "pencil") }
-            }
-        }
-        .alert(L("detail_rename"), isPresented: $showRename) {
-            TextField(L("add_name_label"), text: $newName)
-            Button(L("save")) { store.rename(game, to: newName) }
-            Button(L("cancel"), role: .cancel) {}
-        }
-        .confirmationDialog(L("confirm_clear_saves", game.name), isPresented: $confirmClear, titleVisibility: .visible) {
-            Button(L("detail_clear_saves"), role: .destructive) { store.clearSaves(game); refresh += 1 }
-        }
-        .confirmationDialog(L("confirm_remove", game.name), isPresented: $confirmRemove, titleVisibility: .visible) {
-            Button(L("detail_remove"), role: .destructive) { store.remove(game) }
-        }
-        .fileImporter(isPresented: $pickKeys, allowedContentTypes: [.plainText, .data]) { result in
-            guard case .success(let url) = result else { return }
-            let count = store.setKeys(game, text: store.readText(url))
-            verifyMessage = count > 0 ? L("add_keys_ok", count) : L("add_keys_invalid")
-            refresh += 1
-        }
     }
+    #endif
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack {

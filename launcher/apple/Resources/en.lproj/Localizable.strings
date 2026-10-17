@@ -59,6 +59,10 @@
 "detail_clear_saves" = "Delete Save Data";
 "detail_remove" = "Remove Game";
 "detail_rename" = "Rename";
+"detail_section_info" = "Details";
+"detail_section_manage" = "Manage";
+"detail_section_danger" = "Delete";
+"select_game" = "Select a game";
 "confirm_clear_saves" = "Delete all save data of “%@”? This cannot be undone.";
 "confirm_remove" = "Remove “%@” from the library? Copied files and save data are deleted; a linked folder is left untouched.";
 "verify_ok" = "All good: %d archives opened with the keys.";

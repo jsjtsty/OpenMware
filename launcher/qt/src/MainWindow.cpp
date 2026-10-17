@@ -28,6 +28,7 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QTimer>
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -218,6 +219,11 @@ MainWindow::MainWindow() {
 		if (const Game* g = library_->find(id)) statusBar()->showMessage(T("playing") + QStringLiteral(": ") + g->name);
 		updateActions();
 		refreshDetail();
+		// The launcher steps aside while the game runs and comes back when it ends. The short wait lets the game's
+		// window appear first, and skips hiding when it fails at once.
+		QTimer::singleShot(800, this, [this, id] {
+			if (player_->running() && player_->playingId() == id) hide();
+		});
 	});
 	connect(player_, &Player::finished, this, [this](const QString& id, double seconds, const QString& error) {
 		model_->setPlaying(QString());
@@ -225,6 +231,7 @@ MainWindow::MainWindow() {
 		statusBar()->clearMessage();
 		updateActions();
 		refreshDetail();
+		show();
 		raise();
 		activateWindow();
 		if (!error.isEmpty()) showError(error);
