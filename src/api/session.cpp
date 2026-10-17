@@ -127,6 +127,19 @@ int run_session(const RunOptions& opt, std::string* error) {
 					input.set_cursor(c.x, c.y);
 					if (c.click) input.tap_mouse(c.button);
 				}
+			for (const auto& c : opt.touch_cmds) {
+				if (frame != c.frame && frame != c.frame + c.frames) continue;
+				int ww = 0, wh = 0;
+				SDL_GetWindowSize(gpu.window, &ww, &wh);
+				const float s = std::min(static_cast<float>(ww) / Stage::kWidth, static_cast<float>(wh) / Stage::kHeight);
+				SDL_Event ev{};
+				ev.type = frame == c.frame ? SDL_EVENT_FINGER_DOWN : SDL_EVENT_FINGER_UP;
+				ev.tfinger.touchID = 1;
+				ev.tfinger.fingerID = 1;
+				ev.tfinger.x = ((ww - Stage::kWidth * s) * 0.5f + c.x * s) / ww;
+				ev.tfinger.y = ((wh - Stage::kHeight * s) * 0.5f + c.y * s) / wh;
+				SDL_PushEvent(&ev);
+			}
 			for (const auto& c : opt.auto_clicks)
 				if (frame >= c.first && (frame - c.first) % c.period == 0) {
 					input.set_cursor(c.x, c.y);

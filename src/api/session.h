@@ -20,6 +20,8 @@ struct RunOptions {
 	std::vector<std::pair<int, std::string>> evals; // FRAME:CODE, a script snippet run at a frame
 	struct MouseCmd { int frame; float x, y; bool click; int button = 0; };
 	std::vector<MouseCmd> mouse_cmds; // FRAME:X:Y[:click|:rclick]
+	struct TouchCmd { int frame; float x, y; int frames; };
+	std::vector<TouchCmd> touch_cmds; // FRAME:X:Y:FRAMES, a finger rests at (X,Y) for FRAMES frames (real SDL finger events)
 	struct AutoClick { int first, period; float x, y; };
 	std::vector<AutoClick> auto_clicks; // a click every PERIOD frames from FIRST on
 	std::vector<std::pair<int, std::string>> shots_at; // FRAME:PATH, extra screenshots (offscreen)

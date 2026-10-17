@@ -80,6 +80,10 @@ int main(int argc, char** argv) {
 			if (spec.find("rclick") != std::string::npos) c.button = 1;
 			if (std::sscanf(spec.c_str(), "%d:%f:%f", &c.frame, &c.x, &c.y) == 3) opt.mouse_cmds.push_back(c);
 		}
+		else if (a == "--touch" && i + 1 < argc) { // FRAME:X:Y:FRAMES
+			RunOptions::TouchCmd c{0, 0, 0, 1};
+			if (std::sscanf(argv[++i], "%d:%f:%f:%d", &c.frame, &c.x, &c.y, &c.frames) == 4) opt.touch_cmds.push_back(c);
+		}
 		else if (a == "--eval-file" && i + 1 < argc) { // FRAME:PATH (script snippet read from a UTF-8 file)
 			const std::string spec = argv[++i];
 			std::ifstream in(spec.substr(spec.find(':') + 1), std::ios::binary);

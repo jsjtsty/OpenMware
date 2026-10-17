@@ -34,7 +34,6 @@ SQInteger ret_true(HSQUIRRELVM v) { sq_pushbool(v, SQTrue); return 1; }
 SQInteger ret_false(HSQUIRRELVM v) { sq_pushbool(v, SQFalse); return 1; }
 SQInteger ret_zero(HSQUIRRELVM v) { sq_pushinteger(v, 0); return 1; }
 SQInteger ret_zero_f(HSQUIRRELVM v) { sq_pushfloat(v, 0.f); return 1; }
-SQInteger ret_vec2_zero(HSQUIRRELVM v) { set_ret(v, 1, 0.f); set_ret(v, 2, 0.f); return 0; }
 SQInteger ret_empty_array(HSQUIRRELVM v) { sq_newarray(v, 0); return 1; }
 
 SQInteger ctor(HSQUIRRELVM) { return 0; }
@@ -146,6 +145,45 @@ void register_app_class(ScriptHost& h) {
 	h.add_method("getMouseWheelState", [](HSQUIRRELVM v) -> SQInteger { sq_pushinteger(v, input() ? (input()->wheel > 0 ? 6 : input()->wheel < 0 ? 5 : 4) : 4); return 1; });
 	h.add_method("getCursorPosition", [](HSQUIRRELVM v) -> SQInteger { set_ret(v, 1, input() ? input()->mouse_x : 0.f); set_ret(v, 2, input() ? input()->mouse_y : 0.f); return 0; });
 	h.add_method("getMouseMove", [](HSQUIRRELVM v) -> SQInteger { set_ret(v, 1, input() ? input()->mouse_dx : 0.f); set_ret(v, 2, input() ? input()->mouse_dy : 0.f); return 0; });
+	// Touch screen: the scripts address fingers by index (0 .. contact count - 1) and read vectors back through set_ret.
+	h.add_method("getTouchContactNum", [](HSQUIRRELVM v) -> SQInteger { sq_pushinteger(v, input() ? input()->touch_count() : 0); return 1; });
+	h.add_method("getTouchState", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		sq_pushinteger(v, t ? t->state : 0);
+		return 1;
+	});
+	h.add_method("isTouchMoving", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		sq_pushbool(v, t && t->moving ? SQTrue : SQFalse);
+		return 1;
+	});
+	h.add_method("getTouchTime", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		sq_pushfloat(v, t ? t->time_ms : 0.f);
+		return 1;
+	});
+	h.add_method("getTouchPosition", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		set_ret(v, 1, t ? t->x : 0.f);
+		set_ret(v, 2, t ? t->y : 0.f);
+		return 0;
+	});
+	h.add_method("getTouchMove", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		set_ret(v, 1, t ? t->dx : 0.f);
+		set_ret(v, 2, t ? t->dy : 0.f);
+		return 0;
+	});
+	h.add_method("getTouchVelocity", [](HSQUIRRELVM v) -> SQInteger {
+		const auto* t = input() ? input()->touch(static_cast<int>(sqb::arg_int(v, 2))) : nullptr;
+		set_ret(v, 1, t ? t->vx : 0.f);
+		set_ret(v, 2, t ? t->vy : 0.f);
+		return 0;
+	});
+	h.add_method("clearTouchInput", [](HSQUIRRELVM) -> SQInteger {
+		if (input()) input()->clear_touch();
+		return 0;
+	});
 	h.add_method("loadSystemFont", [](HSQUIRRELVM v) -> SQInteger { // (name, family, size, weight, code_page, ...)
 		if (ScriptHost::current()->renderer)
 			ScriptHost::current()->renderer->fonts().register_font(sqb::arg_string(v, 2), sqb::arg_string(v, 3), sqb::arg_float(v, 4, 21.f));
@@ -156,15 +194,12 @@ void register_app_class(ScriptHost& h) {
 	for (const char* n : {"unloadTexture", "unloadFont", "unloadParticle", "unmountFile", "clearFontCache", "setParticleDebugDrawEnable",
 						  "injectSoundFile", "ejectSoundFile", "defineSoundGroup", "setSoundGroupVolume",
 						  "createPhysicsWorld", "deletePhysicsWorld", "saveSystemConfig", "applyPresetConfig", "applySystemConfig",
-						  "setCursor", "showCursor", "setCursorPosition", "clearMouseInput", "clearTouchInput", "setGamepadVibration",
+						  "setCursor", "showCursor", "setCursorPosition", "clearMouseInput", "setGamepadVibration",
 						  "fadeoutScreen", "fadeoutColor", "callTask", "bindModule", "loadModule"})
 		h.add_method(n, ret_null);
 	for (const char* n : {"isMounted", "isExistUserSetting"}) h.add_method(n, ret_false);
-	for (const char* n : {"getFileTime", "getCursor", "isButtonDown",
-						  "getGamepadButtonState", "getTouchContactNum", "getTouchState", "isTouchMoving"})
-		h.add_method(n, ret_zero);
-	for (const char* n : {"getGamepadThumbValue", "getGamepadTriggerValue", "getTouchTime"}) h.add_method(n, ret_zero_f);
-	for (const char* n : {"getTouchPosition", "getTouchMove", "getTouchVelocity"}) h.add_method(n, ret_vec2_zero);
+	for (const char* n : {"getFileTime", "getCursor", "isButtonDown", "getGamepadButtonState"}) h.add_method(n, ret_zero);
+	for (const char* n : {"getGamepadThumbValue", "getGamepadTriggerValue"}) h.add_method(n, ret_zero_f);
 	for (const char* n : {"getParticleNameList"}) h.add_method(n, ret_empty_array);
 	h.end_class();
 }

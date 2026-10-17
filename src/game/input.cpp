@@ -1,6 +1,7 @@
 #include "game/input.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 
 namespace omw {
@@ -9,7 +10,8 @@ namespace {
 // SDL scancode -> DirectInput scan code (the numbering behind KEY_CODE_*). 0 = not mapped.
 int to_dik(SDL_Scancode sc) {
 	switch (sc) {
-	case SDL_SCANCODE_ESCAPE: return 1;
+	case SDL_SCANCODE_ESCAPE:
+	case SDL_SCANCODE_AC_BACK: return 1; // the Android back button
 	case SDL_SCANCODE_1: return 2;
 	case SDL_SCANCODE_2: return 3;
 	case SDL_SCANCODE_3: return 4;
@@ -123,6 +125,17 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 	mouse_pressed[0] = mouse_pressed[1] = mouse_released[0] = mouse_released[1] = false;
 	wheel = 0;
 
+	// fingers: a lifted one is gone after the frame that reported UP, a new one turns into a held one
+	for (auto& t : touches) {
+		t.dx = t.dy = t.vx = t.vy = 0;
+		if (t.state == 3) continue;
+		if (t.state == 1) t.state = 2;
+		t.time_ms += dt_ms;
+	}
+	touches.erase(std::remove_if(touches.begin(), touches.end(), [](const Touch& t) { return t.state == 3 && !t.pending_up; }), touches.end());
+	for (auto& t : touches)
+		if (t.pending_up) { t.pending_up = false; t.state = 3; }
+
 	for (int i = 0; i < 256; i++) {
 		if (tap_[i] == 2) {
 			key_down[i] = key_pressed[i] = true;
@@ -168,11 +181,50 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 			key_down[dik] = down;
 			break;
 		}
+		case SDL_EVENT_FINGER_DOWN:
+		case SDL_EVENT_FINGER_MOTION:
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED: {
+			int ww = 0, wh = 0;
+			if (window) SDL_GetWindowSize(window, &ww, &wh);
+			if (ww <= 0 || wh <= 0) break;
+			const float scale = std::min(static_cast<float>(ww) / game_w, static_cast<float>(wh) / game_h);
+			const float gx = std::clamp((e.tfinger.x * ww - (ww - game_w * scale) * 0.5f) / scale, 0.f, static_cast<float>(game_w));
+			const float gy = std::clamp((e.tfinger.y * wh - (wh - game_h * scale) * 0.5f) / scale, 0.f, static_cast<float>(game_h));
+			auto it = std::find_if(touches.begin(), touches.end(), [&](const Touch& t) { return t.id == e.tfinger.fingerID && t.state != 3 && !t.pending_up; });
+			if (e.type == SDL_EVENT_FINGER_DOWN) {
+				Touch t;
+				t.id = e.tfinger.fingerID;
+				t.x = t.start_x = gx;
+				t.y = t.start_y = gy;
+				touches.push_back(t);
+				break;
+			}
+			if (it == touches.end()) break;
+			it->dx += gx - it->x;
+			it->dy += gy - it->y;
+			it->x = gx;
+			it->y = gy;
+			if (dt_ms > 0) {
+				it->vx = it->dx * 1000.f / dt_ms;
+				it->vy = it->dy * 1000.f / dt_ms;
+			}
+			if (std::hypot(gx - it->start_x, gy - it->start_y) > 12.f) it->moving = true; // a finger is never perfectly still
+			if (e.type != SDL_EVENT_FINGER_MOTION) {
+				if (it->state == 1) it->pending_up = true; // down and up within one frame: show DOWN first
+				else it->state = 3;
+			}
+			break;
+		}
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP: {
 			const int b = e.button.button == SDL_BUTTON_LEFT ? 0 : e.button.button == SDL_BUTTON_RIGHT ? 1 : -1;
 			if (b < 0) break;
 			const bool down = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+			if (e.button.which == SDL_TOUCH_MOUSEID && swallow_touch_mouse_) { // the release of a long press the script already used
+				if (!down) swallow_touch_mouse_ = false;
+				break;
+			}
 			if (down && !mouse_down[b]) mouse_pressed[b] = true;
 			if (!down && mouse_down[b]) mouse_released[b] = true;
 			mouse_down[b] = down;
@@ -210,6 +262,32 @@ void InputState::poll(SDL_Window* window, int game_w, int game_h, float dt_ms) {
 		mouse_dy = gy - mouse_y;
 		mouse_x = gx;
 		mouse_y = gy;
+	}
+}
+
+int InputState::touch_count() const {
+	int n = 0;
+	for (const auto& t : touches) n += !t.hidden;
+	return n;
+}
+
+const InputState::Touch* InputState::touch(int index) const {
+	for (const auto& t : touches) {
+		if (t.hidden) continue;
+		if (index-- == 0) return &t;
+	}
+	return nullptr;
+}
+
+void InputState::clear_touch() {
+	for (auto& t : touches) {
+		if (t.state == 3 || t.hidden) continue;
+		t.hidden = true;
+		// The emulated left button of this finger is released now; the real release that follows must not click what is under it.
+		if (mouse_down[0] && t.time_ms >= 300.f) {
+			mouse_down[0] = false;
+			swallow_touch_mouse_ = true;
+		}
 	}
 }
 
