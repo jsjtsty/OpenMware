@@ -1,13 +1,13 @@
 name: Build
 
-# Builds the engine for every platform (no game data is involved or shipped). All third-party code (SDL3, zstd, libwebp,
-# stb, FFmpeg) is fetched as source and compiled by CMake, see cmake/Dependencies.cmake and cmake/FFmpeg.cmake; the shaders
-# are the checked-in ones under shaders/prebuilt.
-#   windows  OpenMware zip (Vulkan + Direct3D 12)
-#   macos    OpenMware.app (Metal), ad-hoc signed
-#   android  OpenMware debug APK (Vulkan), arm64-v8a
-#   ios      unsigned OpenMware.ipa for arm64 devices (Metal)
-# Only the Windows build has been run before this file was written: expect to iterate on the others.
+# Builds the engine and the launchers for every platform (no game data is involved or shipped). All third-party code (SDL3,
+# zstd, libwebp, stb, FFmpeg) is fetched as source and compiled by CMake, see cmake/Dependencies.cmake and cmake/FFmpeg.cmake;
+# the shaders are the checked-in ones under shaders/prebuilt. The scripts do the real work, so every step can be run locally:
+#   windows  OpenMware.exe (command line player; Vulkan + Direct3D 12)                 build: cmake
+#   macos    OpenMware.app: SwiftUI launcher + openmware-player, Metal, ad-hoc signed   build: scripts/apple/build.sh macos
+#   ios      unsigned OpenMware.ipa: SwiftUI launcher with libmware in-process, Metal   build: scripts/apple/build.sh ios
+#   android  OpenMware APK: Compose launcher + SDL activity, Vulkan, arm64-v8a          build: scripts/android/build.sh
+# Only the Windows build has been run on real hardware; expect to iterate on the others.
 
 on:
   push:
@@ -78,35 +78,25 @@ jobs:
 
   macos:
     name: macOS arm64
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
       - name: Build tools
-        run: brew install ninja
+        run: brew install ninja xcodegen
 
       # Xcode 26 ships the Metal compiler as a separate download; without it the MSL source is shipped instead of .metallib.
       - name: Metal toolchain
         run: xcodebuild -downloadComponent MetalToolchain || true
 
-      - name: Configure
-        run: >
-          cmake -S . -B build -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_OSX_ARCHITECTURES=arm64
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-
-      - name: Build
-        run: cmake --build build --target openmware
-
-      - name: Test
-        run: cmake --build build --target test_easing && build/test_easing
-
-      - name: Sign (ad hoc) and package
+      - name: Engine tests
         run: |
-          codesign --force --deep --sign - build/OpenMware.app
-          mkdir -p dist
-          ditto -c -k --keepParent build/OpenMware.app dist/OpenMware-macos-arm64.zip
+          cmake -S . -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMW_BUILD_LIBRARY=OFF
+          cmake --build build/tests --target test_easing
+          build/tests/test_easing
+
+      - name: Launcher app
+        run: bash scripts/apple/build.sh macos
 
       - uses: actions/upload-artifact@v4
         with:
@@ -124,6 +114,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - uses: android-actions/setup-android@v3
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -131,55 +123,33 @@ jobs:
       - name: Build tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: Configure
+      - name: NDK
         run: |
-          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26
+          sdkmanager "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Build libmain.so and libSDL3.so
-        run: cmake --build build --target openmware
-
-      - name: Assemble the APK
-        run: |
-          bash scripts/android/prepare_project.sh build
-          gradle --no-daemon -p android assembleDebug
+      - name: App
+        run: bash scripts/android/build.sh debug
 
       - uses: actions/upload-artifact@v4
         with:
           name: OpenMware-android-arm64
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: dist/OpenMware-android-arm64-debug.apk
 
   ios:
     name: iOS arm64
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build tools
+        run: brew install xcodegen
 
       - name: Metal toolchain
         run: xcodebuild -downloadComponent MetalToolchain || true
 
-      - name: Configure
-        run: >
-          cmake -S . -B build -G Xcode
-          -DCMAKE_SYSTEM_NAME=iOS
-          -DCMAKE_OSX_SYSROOT=iphoneos
-          -DCMAKE_OSX_ARCHITECTURES=arm64
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
-
-      - name: Build (unsigned)
-        run: >
-          cmake --build build --config Release --target openmware --
-          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
-
-      - name: Package an unsigned IPA
-        run: |
-          mkdir -p dist/Payload
-          cp -R build/Release-iphoneos/OpenMware.app dist/Payload/
-          (cd dist && zip -qry OpenMware-ios-arm64-unsigned.ipa Payload)
+      - name: Launcher app (unsigned)
+        run: bash scripts/apple/build.sh ios
 
       - uses: actions/upload-artifact@v4
         with:

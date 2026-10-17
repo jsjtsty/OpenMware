@@ -1,0 +1,120 @@
+# XcodeGen project for the macOS and iOS launchers (SwiftUI). Generate with `xcodegen generate` after
+# scripts/apple/build.sh has built libmware and filled Staging/<platform>/ (that script does both).
+name: OpenMware
+options:
+  bundleIdPrefix: org.openmware
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "16.0"
+    macOS: "13.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    PRODUCT_NAME: OpenMware
+    EXECUTABLE_NAME: openmware
+    PRODUCT_BUNDLE_IDENTIFIER: org.openmware.app
+    SWIFT_OBJC_BRIDGING_HEADER: Sources/Shared/OpenMware-Bridging-Header.h
+    HEADER_SEARCH_PATHS: "$(SRCROOT)/../../include"
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEVELOPMENT_ASSET_PATHS: ""
+
+targets:
+  OpenMware-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/Shared
+      - Resources
+      # The shaders (.metallib) and licence texts are folders copied as they are into Contents/Resources.
+      - path: Staging/macos/shaders
+        type: folder
+        buildPhase: resources
+      - path: Staging/macos/licenses
+        type: folder
+        buildPhase: resources
+      # FFmpeg (LGPL) stays dynamic: its dylibs go into Contents/Frameworks, next to mware.framework.
+      - path: Staging/macos/ffmpeg
+        buildPhase:
+          copyFiles:
+            destination: frameworks
+            subpath: ""
+            phaseOrder: postCompile
+        attributes: [CodeSignOnCopy]
+      # The game itself runs in this helper process (Contents/MacOS/openmware-player).
+      - path: Staging/macos/player
+        buildPhase:
+          copyFiles:
+            destination: executables
+            subpath: ""
+            phaseOrder: postCompile
+        attributes: [CodeSignOnCopy]
+    dependencies:
+      - framework: Staging/macos/mware.framework
+        embed: true
+        codeSign: true
+    info:
+      path: Staging/macos/Info.plist
+      properties:
+        CFBundleDisplayName: OpenMware
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.games
+        LSMinimumSystemVersion: "13.0"
+        NSHumanReadableCopyright: "OpenMware contributors"
+        CFBundleLocalizations: [en, zh-Hans]
+    settings:
+      base:
+        ARCHS: arm64
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        COMBINE_HIDPI_IMAGES: YES
+
+  OpenMware-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/Shared
+      - Resources
+      - path: Staging/ios/shaders
+        type: folder
+        buildPhase: resources
+      - path: Staging/ios/licenses
+        type: folder
+        buildPhase: resources
+      - path: Staging/ios/ffmpeg
+        buildPhase:
+          copyFiles:
+            destination: frameworks
+            subpath: ""
+            phaseOrder: postCompile
+        attributes: [CodeSignOnCopy]
+    dependencies:
+      - framework: Staging/ios/mware.framework
+        embed: true
+        codeSign: true
+    info:
+      path: Staging/ios/Info.plist
+      properties:
+        CFBundleDisplayName: OpenMware
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleLocalizations: [en, zh-Hans]
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UIRequiredDeviceCapabilities: [arm64, metal]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    settings:
+      base:
+        ARCHS: arm64
+        TARGETED_DEVICE_FAMILY: "1,2"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks"
+        SDKROOT: iphoneos
+        CODE_SIGN_STYLE: Manual

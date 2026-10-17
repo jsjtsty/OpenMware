@@ -1,18 +1,10 @@
 # Android and iOS
 
-The app contains no game data. Put your own copy next to the keys file in the app's data folder:
+The apps contain no game data. Open OpenMware, tap **Add game**, pick the folder with your copy of the game (the one holding `script.npk`, `cg.npk`, ...) and import the keys file (or paste the keys). See [launchers.md](launchers.md) for what the apps do.
 
-```
-<data folder>/game/        the game's files (the .npk archives)
-<data folder>/keys.txt     the decryption keys
-<data folder>/save/        written by the game
-```
+* **Android**: the archives are copied into the app's private storage (the system folder picker hands out `content://` access, not paths), so you need the free space once. The original folder can be deleted afterwards. Save data is exported from the game's page (a zip you can share).
+* **iOS**: the folder can stay where it is (the app keeps a security-scoped bookmark; files in iCloud Drive must be downloaded first) or be copied into the app. Pick it from the Files app: *On My iPhone*, iCloud Drive, a USB drive or a network share all work.
 
-* **Android**: `Android/data/org.openmware.omw/files/` on the device's shared storage. Copy with `adb push game /sdcard/Android/data/org.openmware.omw/files/game` (Android 11+ file managers cannot open `Android/data`; use adb or a computer).
-* **iOS**: the app's Documents folder, visible in the Files app under "On My iPhone > OpenMware" (file sharing is enabled in the Info.plist). Copy with Finder / the Files app.
+The command-line engine (`OpenMware GAME_DIR --keys FILE --data-dir DIR`) is what the Android activity and the macOS app run underneath; on iOS the same code runs in the app's process through libmware.
 
-Both builds start the game from `game/` automatically when no path is given. Touch: tap = left click, long press / two-finger tap is not mapped yet (the right-click menu needs a keyboard or mouse for now).
-
-Status: the Windows build is the only one that has been run. The Android/iOS workflows compile the same code, but Vulkan and Metal rendering, touch input and these folder conventions are untested on devices.
-
-The iOS package is unsigned: re-sign it (AltStore, Sideloadly, or your own certificate) before installing.
+Status: the Android and iOS apps have only been built by CI, not run on devices. The iOS package is unsigned: re-sign it (AltStore, Sideloadly, or your own certificate) before installing; the Android APK is debug-signed.

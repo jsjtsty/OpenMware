@@ -81,75 +81,70 @@ if(OMW_BUILD_TOOLS)
 endif()
 
 # --- The game ------------------------------------------------------------------------------------
-# Android: SDL's Java activity loads libmain.so and calls SDL_main in it. Everywhere else it is the executable "openmware"
-# (an app bundle on macOS and iOS, with the shaders inside).
+# One run of the game (window, renderer, audio, script loop), shared by the command-line program and the library.
+add_library(omw_session STATIC src/api/session.cpp)
+target_link_libraries(omw_session PUBLIC omw_script omw_render omw_game)
+add_dependencies(omw_session omw_shaders)
+
+# FFmpeg (LGPL) is a set of shared libraries that ship next to whatever links them (see omw_ffmpeg_runtime below).
+# Android: SDL's Java activity loads libmain.so and calls SDL_main in it. iOS has no command-line program, only libmware.
 if(ANDROID)
 	add_library(openmware SHARED apps/openmware.cpp)
 	set_target_properties(openmware PROPERTIES OUTPUT_NAME main)
-else()
+elseif(NOT IOS)
 	add_executable(openmware apps/openmware.cpp)
-	set_target_properties(openmware PROPERTIES OUTPUT_NAME OpenMware) # OpenMware.exe / OpenMware.app
-endif()
-target_link_libraries(openmware PRIVATE omw_script omw_render omw_game)
-add_dependencies(openmware omw_shaders)
-# FFmpeg (LGPL) is a set of shared libraries that ship next to the program, in the bundle's Frameworks folder on Apple.
-if(TARGET ffmpeg_ext AND OMW_FFMPEG_SHARED)
-	if(WIN32)
-		add_custom_command(TARGET openmware POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:openmware>)
-	elseif(APPLE)
-		if(IOS)
-			set(_omw_fw_dest "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/Frameworks")
-			set_target_properties(openmware PROPERTIES BUILD_RPATH "@executable_path/Frameworks" INSTALL_RPATH "@executable_path/Frameworks")
-		else()
-			set(_omw_fw_dest "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/Frameworks")
-			set_target_properties(openmware PROPERTIES BUILD_RPATH "@executable_path/../Frameworks" INSTALL_RPATH "@executable_path/../Frameworks")
-		endif()
-		add_custom_command(TARGET openmware POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E make_directory "${_omw_fw_dest}"
-			COMMAND sh -c "cp -R '${OMW_FFMPEG_RUNTIME_DIR}'/*.dylib \"$1\"" sh "${_omw_fw_dest}"
-			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_LICENSE_DIR}" "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/Resources/licenses"
-			VERBATIM
-			COMMENT "Copying the FFmpeg dynamic libraries into the app bundle")
-	elseif(NOT ANDROID)
-		set_target_properties(openmware PROPERTIES BUILD_RPATH "$ORIGIN/lib" INSTALL_RPATH "$ORIGIN/lib")
-		add_custom_command(TARGET openmware POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:openmware>/lib)
+	# OpenMware.exe on Windows; openmware-player inside the macOS launcher app (the launcher is OpenMware.app/.../openmware)
+	if(APPLE)
+		set_target_properties(openmware PROPERTIES OUTPUT_NAME openmware-player)
+	else()
+		set_target_properties(openmware PROPERTIES OUTPUT_NAME OpenMware)
 	endif()
 endif()
-if(OMW_FFMPEG_DLLS) # only with OMW_FFMPEG_ROOT pointing at a shared FFmpeg
-	add_custom_command(TARGET openmware POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:openmware>)
+if(TARGET openmware)
+	target_link_libraries(openmware PRIVATE omw_session)
 endif()
 
-if(APPLE)
-	set_target_properties(openmware PROPERTIES
-		MACOSX_BUNDLE TRUE
-		MACOSX_BUNDLE_GUI_IDENTIFIER "org.openmware.omw"
-		MACOSX_BUNDLE_BUNDLE_NAME "OpenMware"
-		MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-		MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-		MACOSX_BUNDLE_INFO_PLIST "${PROJECT_SOURCE_DIR}/cmake/Info.plist.in"
-		MACOSX_BUNDLE_EXECUTABLE_NAME "openmware" # OpenMware.app/.../openmware
-		XCODE_ATTRIBUTE_EXECUTABLE_NAME "openmware"
-		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.openmware.omw")
-	# Makefile / Ninja generators name the executable after the bundle: rename it as the plist says (Xcode already did).
-	if(IOS)
-		set(_omw_exec_dir "$<TARGET_BUNDLE_CONTENT_DIR:openmware>")
-	else()
-		set(_omw_exec_dir "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/MacOS")
+# libmware: the engine as a library for the SwiftUI launcher (iOS in-process player, macOS probe), a framework on Apple.
+option(OMW_BUILD_LIBRARY "Build libmware (include/mware/mware.h)" ${APPLE})
+if(OMW_BUILD_LIBRARY)
+	add_library(mware SHARED src/api/mware.cpp)
+	target_include_directories(mware PUBLIC include)
+	target_link_libraries(mware PRIVATE omw_session)
+	if(APPLE)
+		set_target_properties(mware PROPERTIES
+			FRAMEWORK TRUE
+			FRAMEWORK_VERSION A
+			PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/mware/mware.h"
+			MACOSX_FRAMEWORK_IDENTIFIER org.openmware.mware
+			MACOSX_FRAMEWORK_BUNDLE_VERSION "${PROJECT_VERSION}"
+			MACOSX_FRAMEWORK_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+			XCODE_ATTRIBUTE_INSTALL_PATH "@rpath")
+		# The launcher puts the FFmpeg dylibs next to mware.framework, in its Frameworks folder.
+		set_target_properties(mware PROPERTIES
+			BUILD_RPATH "@loader_path/..;@loader_path/../../.." INSTALL_RPATH "@loader_path/..;@loader_path/../../..")
 	endif()
-	add_custom_command(TARGET openmware POST_BUILD
-		COMMAND sh -c "if [ -f \"$1/OpenMware\" ]; then mv \"$1/OpenMware\" \"$1/openmware\"; fi" sh "${_omw_exec_dir}"
-		VERBATIM)
-	# The engine finds its shaders next to the bundle's resources (SDL_GetBasePath).
-	if(IOS)
-		set(_omw_shader_dest "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/shaders")
-	else()
-		set(_omw_shader_dest "$<TARGET_BUNDLE_CONTENT_DIR:openmware>/Resources/shaders")
+endif()
+
+function(omw_ffmpeg_runtime target)
+	if(NOT (TARGET ffmpeg_ext AND OMW_FFMPEG_SHARED))
+		return()
 	endif()
-	add_custom_command(TARGET openmware POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_SHADER_OUT}" "${_omw_shader_dest}"
-		COMMENT "Copying shaders into the app bundle")
+	if(WIN32)
+		add_custom_command(TARGET ${target} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:${target}>)
+	elseif(APPLE)
+		set_target_properties(${target} PROPERTIES BUILD_RPATH "@executable_path/../Frameworks" INSTALL_RPATH "@executable_path/../Frameworks")
+	elseif(NOT ANDROID)
+		set_target_properties(${target} PROPERTIES BUILD_RPATH "$ORIGIN/lib" INSTALL_RPATH "$ORIGIN/lib")
+		add_custom_command(TARGET ${target} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:${target}>/lib)
+	endif()
+endfunction()
+if(TARGET openmware)
+	omw_ffmpeg_runtime(openmware)
+	if(OMW_FFMPEG_DLLS) # only with OMW_FFMPEG_ROOT pointing at a shared FFmpeg
+		add_custom_command(TARGET openmware POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:openmware>)
+	endif()
 endif()
 
 # Standalone SQAction1D tempo-curve checks; does not link the script runtime.

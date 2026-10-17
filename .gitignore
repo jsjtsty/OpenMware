@@ -11,9 +11,15 @@ __pycache__/
 
 save/
 temp/
-android/.gradle/
-android/app/build/
-android/app/src/sdl-java/
-android/app/src/main/jniLibs/
-android/app/src/main/assets/
-android/local.properties
+launcher/android/.gradle/
+launcher/android/build/
+launcher/android/app/build/
+launcher/android/app/src/sdl-java/
+launcher/android/app/src/main/jniLibs/
+launcher/android/app/src/main/assets/
+launcher/android/local.properties
+launcher/apple/OpenMware.xcodeproj/
+launcher/apple/Staging/
+dist/
+*.xcuserstate
+.DS_Store

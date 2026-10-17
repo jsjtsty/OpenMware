@@ -21,10 +21,9 @@ cmake --build build
 
 * **Windows (MSVC)**: FFmpeg is configured by its own `configure` script, which needs a POSIX shell: install MSYS2 (`pacman -S make diffutils nasm`), rename `usr\bin\link.exe` away so MSVC's linker wins, and run CMake from a VS developer prompt. `OMW_MSYS2_ROOT` overrides `C:\msys64`. Shortcut for experiments: `-DOMW_FFMPEG_ROOT=<prefix>` uses an existing FFmpeg instead (DLLs next to it are copied).
 * **Linux**: needs the usual SDL3 development packages (X11/Wayland, ALSA/Pulse, ...), `make`, and `nasm` for the fast paths (optional).
-* **macOS / iOS**: Xcode command line tools; the iOS build uses `-G Xcode -DCMAKE_SYSTEM_NAME=iOS`. The target `openmware` is an app bundle with the Metal shaders inside.
-* **Android**: NDK toolchain file, `-DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26`; then `scripts/android/prepare_project.sh <build dir>` and `gradle -p android assembleDebug`.
+* **macOS / iOS / Android**: use the scripts, they build the engine and the native launcher app around it: `scripts/apple/build.sh macos|ios` and `scripts/android/build.sh debug|release`. See [launchers.md](launchers.md).
 
-The CI workflow `.github/workflows/build.yml` does exactly these steps.
+The CI workflow `.github/workflows/build.yml` runs exactly these commands.
 
 ## Shaders
 

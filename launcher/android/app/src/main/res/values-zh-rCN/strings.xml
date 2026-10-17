@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenMware</string>
+
+    <string name="library_title">游戏库</string>
+    <string name="add_game">添加游戏</string>
+    <string name="empty_title">还没有游戏</string>
+    <string name="empty_body">OpenMware 只是引擎，不包含任何游戏。请添加你自己持有的受支持游戏所在的文件夹。</string>
+    <string name="status_ready">可以游玩</string>
+    <string name="status_keys_missing">需要密钥</string>
+    <string name="status_incomplete">文件不完整</string>
+    <string name="never_played">尚未游玩</string>
+    <string name="last_played">上次游玩 %1$s</string>
+    <string name="menu_about">关于</string>
+    <string name="back">返回</string>
+    <string name="cancel">取消</string>
+    <string name="ok">确定</string>
+    <string name="save">保存</string>
+    <string name="close">关闭</string>
+
+    <string name="add_title">添加游戏</string>
+    <string name="add_step_folder">1. 游戏文件夹</string>
+    <string name="add_step_name">2. 名称</string>
+    <string name="add_step_keys">3. 解密密钥</string>
+    <string name="add_choose_folder">选择文件夹</string>
+    <string name="add_change_folder">重新选择文件夹</string>
+    <string name="add_folder_hint">请选择包含 script.npk、cg.npk 等 .npk 文件的文件夹。这些文件会被复制到应用内，原文件可以保留在原处。</string>
+    <string name="add_found">%1$d 个档案，%2$s</string>
+    <string name="add_not_a_game">在该文件夹里没有找到游戏档案（script.npk）。</string>
+    <string name="add_name_label">名称</string>
+    <string name="add_keys_import">导入密钥文件</string>
+    <string name="add_keys_paste">或直接粘贴密钥（每行一个 64 位十六进制密钥）</string>
+    <string name="add_keys_ok">找到 %1$d 个密钥</string>
+    <string name="add_keys_invalid">没有找到有效的密钥</string>
+    <string name="add_import">添加到游戏库</string>
+    <string name="add_copying">正在复制游戏文件…</string>
+    <string name="add_copy_progress">%1$s / %2$s</string>
+    <string name="add_failed">无法添加游戏：%1$s</string>
+    <string name="add_no_space">剩余空间不足，需要 %1$s。</string>
+
+    <string name="play">开始游戏</string>
+    <string name="detail_size">大小</string>
+    <string name="detail_archives">档案数量</string>
+    <string name="detail_play_time">游玩时间</string>
+    <string name="detail_save_size">存档数据</string>
+    <string name="detail_keys">密钥</string>
+    <string name="detail_keys_replace">更换密钥</string>
+    <string name="detail_rename">重命名</string>
+    <string name="detail_export_saves">导出存档</string>
+    <string name="detail_clear_saves">删除存档</string>
+    <string name="detail_remove">移除游戏</string>
+    <string name="detail_no_saves">没有存档</string>
+    <string name="confirm_clear_saves">删除“%1$s”的全部存档？此操作无法撤销。</string>
+    <string name="confirm_remove">从本设备移除“%1$s”及其复制的文件？存档也会一并删除。</string>
+    <string name="cannot_play_keys">请先导入密钥。</string>
+    <string name="cannot_play_incomplete">游戏文件不完整。</string>
+    <string name="minutes_short">%1$d 分钟</string>
+    <string name="hours_short">%1$d 小时 %2$d 分钟</string>
+
+    <string name="about_title">关于</string>
+    <string name="about_body">OpenMware 是开源引擎，直接运行受支持视觉小说的原版数据，本身不含任何游戏数据。请仅配合你自己持有的游戏使用。</string>
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_licenses">开源许可</string>
+    <string name="about_licenses_body">SDL3（zlib）、zstd（BSD）、libwebp（BSD）、stb（公有领域）、Squirrel（MIT）以及 FFmpeg（LGPL 2.1+，作为可替换的独立库随包发布）。</string>
+</resources>

@@ -15,6 +15,7 @@ public:
 	// Opens every known archive found in `game_dir`; `keys_file` holds the NPK keys. Missing archives are skipped.
 	bool open(const std::filesystem::path& game_dir, const std::filesystem::path& keys_file, std::string* error);
 	NpkArchive* archive(const std::string& name) const; // "script", "cg", ...
+	size_t archive_count() const { return archives_.size(); }
 	// Reads a file from the first archive that contains it (ASCII case-insensitive path).
 	bool read(const std::string& path, std::vector<uint8_t>& out) const;
 

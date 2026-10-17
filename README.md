@@ -51,6 +51,8 @@ See [docs/running.md](docs/running.md) and, for phones, [docs/mobile.md](docs/mo
 | `src/`, `apps/` | engine libraries and the `OpenMware` executable |
 | `third_party/squirrel2` | Squirrel 2.2.4 fork |
 | `shaders/` | HLSL sources and pre-compiled `prebuilt/{spv,dxil,msl}` |
+| `include/mware/` | libmware C API for the launchers |
+| `launcher/` | native launchers: SwiftUI (macOS, iOS) and Jetpack Compose (Android), see [docs/launchers.md](docs/launchers.md) |
 | `tools/`, `scripts/` | developer tools (archive extractor, script disassembler, reverse-engineering helpers) |
 | `docs/` | engine, format and script notes |
 | `.github/workflows` | CI for Windows, macOS, Android, iOS |

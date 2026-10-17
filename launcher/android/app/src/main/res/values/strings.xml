@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenMware</string>
+
+    <string name="library_title">Library</string>
+    <string name="add_game">Add game</string>
+    <string name="empty_title">No games yet</string>
+    <string name="empty_body">OpenMware is an engine and does not include any game. Add the folder of your own copy of a supported game.</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_keys_missing">Keys needed</string>
+    <string name="status_incomplete">Incomplete</string>
+    <string name="never_played">Never played</string>
+    <string name="last_played">Last played %1$s</string>
+    <string name="menu_about">About</string>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="save">Save</string>
+    <string name="close">Close</string>
+
+    <string name="add_title">Add a game</string>
+    <string name="add_step_folder">1. Game folder</string>
+    <string name="add_step_name">2. Name</string>
+    <string name="add_step_keys">3. Decryption keys</string>
+    <string name="add_choose_folder">Choose folder</string>
+    <string name="add_change_folder">Choose another folder</string>
+    <string name="add_folder_hint">Pick the folder that contains script.npk, cg.npk and the other .npk files. They are copied into the app, so the original can stay where it is.</string>
+    <string name="add_found">%1$d archives, %2$s</string>
+    <string name="add_not_a_game">No game archives (script.npk) were found in that folder.</string>
+    <string name="add_name_label">Name</string>
+    <string name="add_keys_import">Import keys file</string>
+    <string name="add_keys_paste">Or paste the keys (one 64-digit hex key per line)</string>
+    <string name="add_keys_ok">%1$d key(s) found</string>
+    <string name="add_keys_invalid">No valid key found</string>
+    <string name="add_import">Add to library</string>
+    <string name="add_copying">Copying game files…</string>
+    <string name="add_copy_progress">%1$s of %2$s</string>
+    <string name="add_failed">Could not add the game: %1$s</string>
+    <string name="add_no_space">Not enough free space: %1$s needed.</string>
+
+    <string name="play">Play</string>
+    <string name="detail_size">Size</string>
+    <string name="detail_archives">Archives</string>
+    <string name="detail_play_time">Play time</string>
+    <string name="detail_save_size">Save data</string>
+    <string name="detail_keys">Keys</string>
+    <string name="detail_keys_replace">Replace keys</string>
+    <string name="detail_rename">Rename</string>
+    <string name="detail_export_saves">Export save data</string>
+    <string name="detail_clear_saves">Delete save data</string>
+    <string name="detail_remove">Remove game</string>
+    <string name="detail_no_saves">No save data</string>
+    <string name="confirm_clear_saves">Delete all save data of “%1$s”? This cannot be undone.</string>
+    <string name="confirm_remove">Remove “%1$s” and its copied files from this device? Save data is deleted too.</string>
+    <string name="cannot_play_keys">Import the keys first.</string>
+    <string name="cannot_play_incomplete">The game files are incomplete.</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="hours_short">%1$d h %2$d min</string>
+
+    <string name="about_title">About</string>
+    <string name="about_body">OpenMware is an open-source engine that runs the original data of supported visual novels. It contains no game data. Use it only with a copy you own.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_licenses">Open-source licences</string>
+    <string name="about_licenses_body">SDL3 (zlib), zstd (BSD), libwebp (BSD), stb (public domain), Squirrel (MIT) and FFmpeg (LGPL 2.1+, shipped as separate libraries that can be replaced).</string>
+</resources>
