@@ -11,7 +11,7 @@ bool GpuContext::init(const char* title, int width, int height, const std::files
 		if (error) *error = SDL_GetError();
 		return false;
 	}
-	const SDL_GPUShaderFormat wanted = SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
+	const SDL_GPUShaderFormat wanted = SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB;
 	device = SDL_CreateGPUDevice(wanted, false, nullptr);
 	if (!device) {
 		if (error) *error = SDL_GetError();
@@ -20,6 +20,8 @@ bool GpuContext::init(const char* title, int width, int height, const std::files
 	const SDL_GPUShaderFormat have = SDL_GetGPUShaderFormats(device);
 	if (have & SDL_GPU_SHADERFORMAT_SPIRV) { format = SDL_GPU_SHADERFORMAT_SPIRV; format_ext = ".spv"; }
 	else if (have & SDL_GPU_SHADERFORMAT_DXIL) { format = SDL_GPU_SHADERFORMAT_DXIL; format_ext = ".dxil"; }
+	// Metal: precompiled libraries are preferred (built by CMake on Apple hosts); the MSL source is compiled by the driver at load.
+	else if (have & SDL_GPU_SHADERFORMAT_METALLIB) { format = SDL_GPU_SHADERFORMAT_METALLIB; format_ext = ".metallib"; }
 	else if (have & SDL_GPU_SHADERFORMAT_MSL) { format = SDL_GPU_SHADERFORMAT_MSL; format_ext = ".msl"; }
 	window = SDL_CreateWindow(title, width, height, SDL_WINDOW_RESIZABLE);
 	if (!window || !SDL_ClaimWindowForGPUDevice(device, window)) {
@@ -49,7 +51,7 @@ SDL_GPUShader* GpuContext::load_shader(const std::string& name, SDL_GPUShaderSta
 	SDL_GPUShaderCreateInfo info{};
 	info.code = static_cast<const Uint8*>(code);
 	info.code_size = code_size;
-	info.entrypoint = format == SDL_GPU_SHADERFORMAT_MSL ? "main0" : "main";
+	info.entrypoint = (format == SDL_GPU_SHADERFORMAT_MSL || format == SDL_GPU_SHADERFORMAT_METALLIB) ? "main0" : "main";
 	info.format = format;
 	info.stage = stage;
 	info.num_samplers = samplers;

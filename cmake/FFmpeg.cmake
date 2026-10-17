@@ -26,12 +26,21 @@ if(OMW_FFMPEG_ROOT)
 endif()
 
 set(_omw_ff_prefix "${CMAKE_BINARY_DIR}/ffmpeg-install")
-set(_omw_ff_src_hint "")
+
+# FFmpeg is LGPL: it is built without --enable-gpl / --enable-nonfree and, by default, as shared libraries that are shipped
+# next to the program (DLLs, .so, .dylib), so that users can replace them with their own FFmpeg build.
+option(OMW_FFMPEG_SHARED "Build FFmpeg as shared libraries (keeps the LGPL relinking right)" ON)
+if(OMW_FFMPEG_SHARED)
+	set(_ff_linkage --enable-shared --disable-static)
+else()
+	set(_ff_linkage --enable-static --disable-shared)
+endif()
+set(_ff_make_vars "")
 
 # --- Target description -------------------------------------------------------------------------
 set(_ff_args
 	--disable-everything --disable-programs --disable-doc --disable-avdevice --disable-avfilter --disable-network
-	--disable-autodetect --disable-debug --enable-static --disable-shared --enable-pic
+	--disable-autodetect --disable-debug ${_ff_linkage} --enable-pic
 	--enable-avcodec --enable-avformat --enable-swscale --enable-swresample
 	--enable-demuxer=asf --enable-parser=vc1
 	--enable-decoder=wmv3,vc1,wmapro,wmav2
@@ -64,6 +73,8 @@ if(ANDROID)
 		"--cc=${_ndk_bin}/${_ff_triple}${ANDROID_PLATFORM_LEVEL}-clang"
 		"--ar=${_ndk_bin}/llvm-ar" "--nm=${_ndk_bin}/llvm-nm" "--ranlib=${_ndk_bin}/llvm-ranlib"
 		"--strip=${_ndk_bin}/llvm-strip")
+	# The APK only packages files named lib*.so: soname libavcodec-<major>.so instead of libavcodec.so.<major>.
+	set(_ff_make_vars "'SLIBNAME_WITH_MAJOR=\$(SLIBPREF)\$(FULLNAME)-\$(LIBMAJOR)\$(SLIBSUF)' 'SLIB_INSTALL_NAME=\$(SLIBNAME_WITH_MAJOR)' 'SLIB_INSTALL_LINKS=\$(SLIBNAME)'")
 elseif(IOS)
 	execute_process(COMMAND xcrun --sdk iphoneos --show-sdk-path OUTPUT_VARIABLE _ios_sdk OUTPUT_STRIP_TRAILING_WHITESPACE)
 	execute_process(COMMAND xcrun --sdk iphoneos --find clang OUTPUT_VARIABLE _ios_cc OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -71,6 +82,9 @@ elseif(IOS)
 	list(APPEND _ff_args --enable-cross-compile --target-os=darwin --arch=arm64 "--cc=${_ios_cc}"
 		"--extra-cflags=${_ios_flags}" "--extra-ldflags=${_ios_flags}")
 	set(_ff_x86 FALSE)
+	if(OMW_FFMPEG_SHARED)
+		list(APPEND _ff_args --install-name-dir=@rpath)
+	endif()
 elseif(APPLE)
 	execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE _mac_sdk OUTPUT_STRIP_TRAILING_WHITESPACE)
 	set(_mac_flags "-arch ${_ff_cpu} -isysroot ${_mac_sdk}")
@@ -79,6 +93,9 @@ elseif(APPLE)
 	endif()
 	list(APPEND _ff_args "--extra-cflags=${_mac_flags}" "--extra-ldflags=${_mac_flags}")
 	list(APPEND _ff_system_libs "-framework CoreFoundation" "-framework Security")
+	if(OMW_FFMPEG_SHARED)
+		list(APPEND _ff_args --install-name-dir=@rpath)
+	endif()
 elseif(WIN32 AND MSVC)
 	list(APPEND _ff_args --toolchain=msvc --target-os=win64 --arch=x86_64)
 	list(APPEND _ff_system_libs bcrypt ws2_32 user32 ole32)
@@ -148,22 +165,38 @@ cd '${_ff_build_sh}'
 if [ ! -f config.h ]; then
   \"\$1/configure\"${_ff_quoted}
 fi
-make -j\"\$(nproc 2>/dev/null || sysctl -n hw.ncpu)\"
-make install
+make -j\"\$(nproc 2>/dev/null || sysctl -n hw.ncpu)\" ${_ff_make_vars}
+make install ${_ff_make_vars}
+mkdir -p '${_ff_prefix_sh}/licenses'
+cp \"\$1\"/COPYING.LGPLv2.1 \"\$1\"/LICENSE.md '${_ff_prefix_sh}/licenses/'
 ")
 omw_msys_path(_ff_script_sh "${_ff_script}")
 set(_ff_src_dir "${CMAKE_BINARY_DIR}/ffmpeg-src")
 omw_msys_path(_ff_src_sh "${_ff_src_dir}")
 
-# --- Byproducts: static libraries ---------------------------------------------------------------
-set(_ff_byproducts "")
+# --- The files to link against (import libraries / unversioned links / archives) ---------------------
+if(MSVC)
+	set(_ff_suf_ ".lib")
+	set(_ff_pfx_ "")
+elseif(OMW_FFMPEG_SHARED)
+	set(_ff_pfx_ "lib")
+	set(_ff_suf_ "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+else()
+	set(_ff_pfx_ "lib")
+	set(_ff_suf_ ".a")
+endif()
+set(_ff_link_files "")
 foreach(_l IN LISTS _omw_ff_libs)
-	if(MSVC)
-		list(APPEND _ff_byproducts "${_omw_ff_prefix}/lib/${_l}.lib")
-	else()
-		list(APPEND _ff_byproducts "${_omw_ff_prefix}/lib/lib${_l}.a")
-	endif()
+	list(APPEND _ff_link_files "${_omw_ff_prefix}/lib/${_ff_pfx_}${_l}${_ff_suf_}")
 endforeach()
+set(_ff_byproducts ${_ff_link_files})
+# Where the runtime libraries land (to be shipped / found at run time).
+if(WIN32)
+	set(OMW_FFMPEG_RUNTIME_DIR "${_omw_ff_prefix}/bin")
+else()
+	set(OMW_FFMPEG_RUNTIME_DIR "${_omw_ff_prefix}/lib")
+endif()
+set(OMW_FFMPEG_LICENSE_DIR "${_omw_ff_prefix}/licenses")
 
 file(MAKE_DIRECTORY "${_ff_build_dir}" "${_omw_ff_prefix}/include")
 
@@ -181,11 +214,7 @@ ExternalProject_Add(ffmpeg_ext
 
 target_include_directories(omw_ffmpeg INTERFACE "${_omw_ff_prefix}/include")
 add_dependencies(omw_ffmpeg ffmpeg_ext)
-foreach(_l IN LISTS _omw_ff_libs)
-	if(MSVC)
-		target_link_libraries(omw_ffmpeg INTERFACE "${_omw_ff_prefix}/lib/${_l}.lib")
-	else()
-		target_link_libraries(omw_ffmpeg INTERFACE "${_omw_ff_prefix}/lib/lib${_l}.a")
-	endif()
-endforeach()
-target_link_libraries(omw_ffmpeg INTERFACE ${_ff_system_libs})
+target_link_libraries(omw_ffmpeg INTERFACE ${_ff_link_files})
+if(NOT OMW_FFMPEG_SHARED)
+	target_link_libraries(omw_ffmpeg INTERFACE ${_ff_system_libs})
+endif()

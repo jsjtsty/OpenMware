@@ -64,6 +64,8 @@ jobs:
           $out = 'dist/OpenMware-windows-x64'
           New-Item -ItemType Directory -Force $out | Out-Null
           Copy-Item build/omw.exe, build/npktool.exe $out
+          Copy-Item build/*.dll $out   # FFmpeg (LGPL) stays a set of DLLs next to the program
+          Copy-Item -Recurse build/ffmpeg-install/licenses "$out/licenses"
           # Windows GPUs take SPIR-V (Vulkan) or DXIL (Direct3D 12); both sets were copied next to the executable.
           Copy-Item -Recurse build/shaders "$out/shaders"
           Copy-Item docs/running.md "$out/README.md"
@@ -82,6 +84,10 @@ jobs:
 
       - name: Build tools
         run: brew install ninja
+
+      # Xcode 26 ships the Metal compiler as a separate download; without it the MSL source is shipped instead of .metallib.
+      - name: Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain || true
 
       - name: Configure
         run: >
@@ -152,6 +158,9 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+
+      - name: Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain || true
 
       - name: Configure
         run: >

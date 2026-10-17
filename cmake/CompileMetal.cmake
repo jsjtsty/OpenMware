@@ -1,0 +1,23 @@
+# cmake -DSDK=macosx|iphoneos -DMIN=<-m...-version-min flag> -DIN=<dir of .msl> -DOUT=<dir> -DTMP=<dir> -P CompileMetal.cmake
+# Compiles every <name>.msl into <OUT>/<name>.metallib (Xcode's metal + metallib). Files that are up to date are skipped.
+file(MAKE_DIRECTORY "${OUT}" "${TMP}")
+file(GLOB _msl "${IN}/*.msl")
+foreach(_f IN LISTS _msl)
+	get_filename_component(_n "${_f}" NAME_WE)
+	get_filename_component(_full "${_f}" NAME)
+	string(REGEX REPLACE "\\.msl$" "" _stem "${_full}")
+	set(_air "${TMP}/${_stem}.air")
+	set(_lib "${OUT}/${_stem}.metallib")
+	if(EXISTS "${_lib}" AND NOT "${_f}" IS_NEWER_THAN "${_lib}")
+		continue()
+	endif()
+	execute_process(COMMAND xcrun -sdk ${SDK} metal -c "${_f}" -o "${_air}" ${MIN}
+		RESULT_VARIABLE _rc ERROR_VARIABLE _err)
+	if(_rc)
+		message(FATAL_ERROR "metal failed for ${_f}:\n${_err}")
+	endif()
+	execute_process(COMMAND xcrun -sdk ${SDK} metallib "${_air}" -o "${_lib}" RESULT_VARIABLE _rc ERROR_VARIABLE _err)
+	if(_rc)
+		message(FATAL_ERROR "metallib failed for ${_f}:\n${_err}")
+	endif()
+endforeach()

@@ -91,6 +91,31 @@ else()
 endif()
 target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
 add_dependencies(omw omw_shaders)
+# FFmpeg (LGPL) is a set of shared libraries that ship next to the program, in the bundle's Frameworks folder on Apple.
+if(TARGET ffmpeg_ext AND OMW_FFMPEG_SHARED)
+	if(WIN32)
+		add_custom_command(TARGET omw POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:omw>)
+	elseif(APPLE)
+		if(IOS)
+			set(_omw_fw_dest "$<TARGET_BUNDLE_CONTENT_DIR:omw>/Frameworks")
+			set_target_properties(omw PROPERTIES BUILD_RPATH "@executable_path/Frameworks" INSTALL_RPATH "@executable_path/Frameworks")
+		else()
+			set(_omw_fw_dest "$<TARGET_BUNDLE_CONTENT_DIR:omw>/Frameworks")
+			set_target_properties(omw PROPERTIES BUILD_RPATH "@executable_path/../Frameworks" INSTALL_RPATH "@executable_path/../Frameworks")
+		endif()
+		add_custom_command(TARGET omw POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E make_directory "${_omw_fw_dest}"
+			COMMAND sh -c "cp -R '${OMW_FFMPEG_RUNTIME_DIR}'/*.dylib \"$1\"" sh "${_omw_fw_dest}"
+			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_LICENSE_DIR}" "$<TARGET_BUNDLE_CONTENT_DIR:omw>/Resources/licenses"
+			VERBATIM
+			COMMENT "Copying the FFmpeg dynamic libraries into the app bundle")
+	elseif(NOT ANDROID)
+		set_target_properties(omw PROPERTIES BUILD_RPATH "$ORIGIN/lib" INSTALL_RPATH "$ORIGIN/lib")
+		add_custom_command(TARGET omw POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:omw>/lib)
+	endif()
+endif()
 if(OMW_FFMPEG_DLLS) # only with OMW_FFMPEG_ROOT pointing at a shared FFmpeg
 	add_custom_command(TARGET omw POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:omw>)
 endif()
