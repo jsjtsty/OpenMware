@@ -3,7 +3,9 @@
 #include "api/session.h"
 #include "game/game_files.h"
 
+#define SDL_MAIN_HANDLED // the host application owns the entry point; only SDL_SetMainReady is wanted from SDL_main.h
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #include <algorithm>
 #include <cstring>

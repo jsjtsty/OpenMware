@@ -47,6 +47,7 @@ set(_ff_args
 	"--prefix=${_omw_ff_prefix}")
 
 set(_ff_pre "")
+set(_ff_env "OMW_UNUSED=1")
 set(_ff_system_libs m)
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _ff_cpu)
 if(CMAKE_OSX_ARCHITECTURES)
@@ -99,7 +100,8 @@ elseif(APPLE)
 elseif(WIN32 AND MSVC)
 	list(APPEND _ff_args --toolchain=msvc --target-os=win64 --arch=x86_64)
 	list(APPEND _ff_system_libs bcrypt ws2_32 user32 ole32)
-	set(_ff_pre "export MSYS2_PATH_TYPE=inherit")
+	# The login shell must keep the PATH, INCLUDE and LIB that vcvars set (cl.exe, link.exe), and stay in the build directory.
+	set(_ff_env MSYS2_PATH_TYPE=inherit CHERE_INVOKING=1)
 endif()
 
 # x86 needs nasm for the fast paths; without it FFmpeg still builds, just slower.
@@ -207,7 +209,7 @@ ExternalProject_Add(ffmpeg_ext
 	SOURCE_DIR "${_ff_src_dir}"
 	BINARY_DIR "${_ff_build_dir}"
 	CONFIGURE_COMMAND ""
-	BUILD_COMMAND "${_omw_sh}" ${_omw_sh_args} "${_ff_script_sh}" "${_ff_src_sh}"
+	BUILD_COMMAND ${CMAKE_COMMAND} -E env ${_ff_env} "${_omw_sh}" ${_omw_sh_args} "${_ff_script_sh}" "${_ff_src_sh}"
 	INSTALL_COMMAND ""
 	BUILD_BYPRODUCTS ${_ff_byproducts}
 	USES_TERMINAL_BUILD TRUE)

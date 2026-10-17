@@ -114,8 +114,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -123,10 +121,14 @@ jobs:
       - name: Build tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: NDK
+      # The runner image already has the Android SDK and an NDK.
+      - name: SDK and NDK
         run: |
-          sdkmanager "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME  NDK=$ANDROID_NDK_LATEST_HOME"
+          SDKMANAGER="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -n1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
 
       - name: App
         run: bash scripts/android/build.sh debug

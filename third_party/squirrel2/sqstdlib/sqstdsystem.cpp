@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sqstdsystem.h>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 #ifdef SQUNICODE
 #include <wchar.h>
@@ -35,7 +38,11 @@ static SQInteger _system_system(HSQUIRRELVM v)
 {
 	const SQChar *s;
 	if(SQ_SUCCEEDED(sq_getstring(v,2,&s))){
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+		sq_pushinteger(v,-1); /* system() does not exist on iOS */
+#else
 		sq_pushinteger(v,scsystem(s));
+#endif
 		return 1;
 	}
 	return sq_throwerror(v,_SC("wrong param"));
