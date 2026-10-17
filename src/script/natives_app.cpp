@@ -40,8 +40,8 @@ SQInteger ret_empty_array(HSQUIRRELVM v) { sq_newarray(v, 0); return 1; }
 SQInteger ctor(HSQUIRRELVM) { return 0; }
 
 InputState* input() { return ScriptHost::current()->input; }
-SQInteger is_key_down(HSQUIRRELVM v) { // (code, repeat_ms): held, re-firing at the interval
-	const bool on = input() && input()->key(static_cast<int>(sqb::arg_int(v, 2)), false, sqb::arg_float(v, 3));
+SQInteger is_key_down(HSQUIRRELVM v) { // (code, trigger, repeat_ms): trigger = only on the frame it went down, else held (re-firing at repeat_ms)
+	const bool on = input() && input()->key(static_cast<int>(sqb::arg_int(v, 2)), sqb::arg_int(v, 3) != 0, sqb::arg_float(v, 4));
 	if (ScriptHost::current()->verbose) std::printf("[f%d] isKeyDown(%d) -> %d\n", ScriptHost::current()->frame, static_cast<int>(sqb::arg_int(v, 2)), on ? 1 : 0);
 	sq_pushbool(v, on ? SQTrue : SQFalse);
 	return 1;

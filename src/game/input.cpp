@@ -221,8 +221,9 @@ int InputState::mouse_state(int b) const {
 }
 
 bool InputState::key(int code, bool trigger, float repeat_ms) const {
-	if (code < 0 || code > 255 || !key_down[code]) return false;
-	if (trigger) return key_pressed[code];
+	if (code < 0 || code > 255) return false;
+	// A press counts on its frame even when the key also came up within that frame (a quick tap).
+	if (trigger || !key_down[code]) return key_pressed[code];
 	if (repeat_ms > 0.f) return key_pressed[code] || key_held_ms[code] >= repeat_ms * 2.f;
 	return true;
 }
