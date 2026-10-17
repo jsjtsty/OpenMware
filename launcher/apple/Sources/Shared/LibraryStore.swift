@@ -244,6 +244,19 @@ final class LibraryStore: ObservableObject {
         #endif
     }
 
+    #if os(macOS)
+    /// Lets the player process take the keyboard focus (it is not known to the system until it has connected).
+    private static func handFocus(to pid: pid_t) {
+        guard pid > 0, let app = NSRunningApplication(processIdentifier: pid) else { return }
+        if #available(macOS 14.0, *) {
+            NSApp.yieldActivation(to: app)
+            _ = app.activate(options: [])
+        } else {
+            _ = app.activate(options: [.activateIgnoringOtherApps])
+        }
+    }
+    #endif
+
     func play(_ game: Game) {
         guard playing == nil else { return }
         guard let access = openGameFolder(game) else {
@@ -270,10 +283,16 @@ final class LibraryStore: ObservableObject {
                     self.lastError = L("error_player_exit", Int(status)) + "\n" + ((try? String(contentsOf: log, encoding: .utf8))?.suffix(400).description ?? "")
                 }
             }
-            // The launcher steps aside while the game runs and comes back when it ends (above). The short wait lets the
-            // game's window appear first, and skips hiding when it fails at once.
+            // The launcher steps aside while the game runs and comes back when it ends (above). macOS only lets a process
+            // started from here take the keyboard focus when this app hands it over, so the activation is yielded to the
+            // player now (its window asks for focus when it opens) and given again once that window is up. The short wait
+            // also skips hiding when the game fails at once.
+            let pid = player?.processIdentifier ?? 0
+            Self.handFocus(to: pid)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                if self?.playing == game.id { NSApp.hide(nil) }
+                guard self?.playing == game.id else { return }
+                Self.handFocus(to: pid)
+                NSApp.hide(nil)
             }
         } catch {
             access.stop()

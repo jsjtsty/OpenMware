@@ -30,6 +30,8 @@ bool GpuContext::init(const char* title, int width, int height, const std::files
 	}
 	// Premultiplication-free SDR output; vsync keeps the 60 Hz pacing of the original.
 	SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
+	// Started by a launcher, the new window would otherwise open behind it without keyboard focus.
+	SDL_RaiseWindow(window);
 	return true;
 }
 
