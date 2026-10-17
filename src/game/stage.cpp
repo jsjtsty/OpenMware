@@ -60,6 +60,11 @@ void Sprite::update(float dt_ms) {
 	trans.update(dt);
 	for (auto& c : color) c.update(dt);
 	fx.update(dt);
+	if (blur.on) {
+		blur.hist.push_back({{move.value[0], move.value[1], move.value[2]}, {rotate.value[0], rotate.value[1], rotate.value[2]}, {scale.value[0], scale.value[1]}});
+		const size_t cap = static_cast<size_t>((blur.count + 1) * blur.latency * 0.06f);
+		while (blur.hist.size() > cap && blur.hist.size() > 1) blur.hist.erase(blur.hist.begin());
+	}
 }
 
 std::shared_ptr<Sprite> Stage::create(const std::string& name) {
@@ -81,18 +86,21 @@ void Stage::update(float dt_ms) {
 }
 
 namespace {
-DrawQuad make_quad(const Sprite* s) {
+DrawQuad make_quad(const Sprite* s, const Sprite::Pose* pose = nullptr) {
 	DrawQuad d;
 	d.texture = s->texture;
 	d.a = s->fade.value[0];
 	const float w = s->width, h = s->height;
 	const float px = s->pivot_x * w, py = s->pivot_y * h;
-	const float cs = std::cos(s->rotate.value[2]), sn = std::sin(s->rotate.value[2]);
+	const float mx = pose ? pose->move[0] : s->move.value[0], my = pose ? pose->move[1] : s->move.value[1];
+	const float rz = pose ? pose->rotate[2] : s->rotate.value[2];
+	const float sx = pose ? pose->scale[0] : s->scale.value[0], sy = pose ? pose->scale[1] : s->scale.value[1];
+	const float cs = std::cos(rz), sn = std::sin(rz);
 	const float lx[4] = {0, w, w, 0}, ly[4] = {0, 0, h, h};
 	for (int i = 0; i < 4; i++) {
-		const float dx = (lx[i] - px) * s->scale.value[0], dy = (ly[i] - py) * s->scale.value[1];
-		d.x[i] = s->move.value[0] + s->shake.off[0] + px + dx * cs - dy * sn;
-		d.y[i] = s->move.value[1] + s->shake.off[1] + py + dx * sn + dy * cs;
+		const float dx = (lx[i] - px) * sx, dy = (ly[i] - py) * sy;
+		d.x[i] = mx + s->shake.off[0] + px + dx * cs - dy * sn;
+		d.y[i] = my + s->shake.off[1] + py + dx * sn + dy * cs;
 		d.r[i] = s->color[i].value[0] / 255.f;
 		d.g[i] = s->color[i].value[1] / 255.f;
 		d.b[i] = s->color[i].value[2] / 255.f;
@@ -117,9 +125,9 @@ DrawQuad make_quad(const Sprite* s) {
 	return d;
 }
 
-DrawItem make_item(const Sprite* s) {
+DrawItem make_item(const Sprite* s, const Sprite::Pose* pose = nullptr) {
 	DrawItem d;
-	static_cast<DrawQuad&>(d) = make_quad(s);
+	static_cast<DrawQuad&>(d) = make_quad(s, pose);
 	d.blend = s->blend;
 	if (s->kind == Sprite::Kind::Screen) {
 		d.snap = DrawItem::Snap::Screen;
@@ -279,7 +287,38 @@ void Stage::build_draw_list(DrawList& out) const {
 			comp.temp = cur;
 			e.item = comp;
 		}
-		buckets[target].push_back(std::move(e));
+		// Afterimages: ghosts at earlier poses of the sprite, oldest first (index i = 0 is the oldest).
+		std::vector<Entry> ghosts;
+		if (s->blur.on && !s->blur.hist.empty() && e.item.snap == DrawItem::Snap::None) {
+			const auto& b = s->blur;
+			const int n = b.count;
+			auto same = [](const Sprite::Pose& p, const Sprite::Pose& q) {
+				for (int k = 0; k < 3; k++)
+					if (static_cast<int>(p.move[k]) != static_cast<int>(q.move[k]) || static_cast<int>(p.rotate[k] * 1000.f) != static_cast<int>(q.rotate[k] * 1000.f)) return false;
+				return static_cast<int>(p.scale[0] * 1000.f) == static_cast<int>(q.scale[0] * 1000.f) && static_cast<int>(p.scale[1] * 1000.f) == static_cast<int>(q.scale[1] * 1000.f);
+			};
+			std::vector<Sprite::Pose> poses;
+			for (int i = 0; i < n; i++) {
+				const size_t lag = static_cast<size_t>((n - i) * b.latency * 0.06f);
+				poses.push_back(lag < b.hist.size() ? b.hist[b.hist.size() - lag - 1] : b.hist.front());
+			}
+			const Sprite::Pose current = b.hist.back();
+			for (int i = 0; i < n; i++) {
+				const Sprite::Pose& next = b.mode == 1 || i == n - 1 ? current : poses[static_cast<size_t>(i) + 1];
+				if (same(poses[static_cast<size_t>(i)], next)) continue;
+				Entry g{s, make_item(s, &poses[static_cast<size_t>(i)]), {}};
+				g.item.a = e.item.a * b.alpha;
+				ghosts.push_back(std::move(g));
+			}
+		}
+		auto& bucket = buckets[target];
+		if (s->blur.back) {
+			for (auto& g : ghosts) bucket.push_back(std::move(g));
+			bucket.push_back(std::move(e));
+		} else {
+			bucket.push_back(std::move(e));
+			for (auto it = ghosts.rbegin(); it != ghosts.rend(); ++it) bucket.push_back(std::move(*it));
+		}
 	}
 	std::set<const Sprite*> emitted;
 	std::function<void(const Sprite*, int)> emit = [&](const Sprite* target, int depth) {

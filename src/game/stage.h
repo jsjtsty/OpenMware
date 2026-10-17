@@ -97,6 +97,18 @@ struct Sprite {
 			raster_phase = std::fmod(raster_phase + raster.value[2] * dt * 0.001f * kTau, kTau);
 		}
 	} fx;
+	// SetBlur (afterimages, Diesel::CEffectBlur): the transform of every frame is recorded; `count` ghosts are drawn at the
+	// poses of (count - i) * latency ms ago (60 frames/s), i = 0..count-1, each with alpha * the sprite's own alpha. A ghost equal
+	// to the next one (mode 0) or to the current pose (mode 1) is skipped. back: ghosts go behind the sprite, else on top.
+	struct Pose {
+		float move[3], rotate[3], scale[2];
+	};
+	struct Blur {
+		bool on = false, back = false;
+		int count = 1, latency = 16, mode = 0;
+		float alpha = 0;
+		std::vector<Pose> hist; // oldest first, the last entry is the current frame
+	} blur;
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
 
 	std::function<void(float dt_ms)> tick; // optional per-frame hook (text typing)

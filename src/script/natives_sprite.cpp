@@ -376,6 +376,24 @@ SQInteger set_shading_parameter(HSQUIRRELVM v) { // (level, density)
 SQInteger get_shading_level(HSQUIRRELVM v) { sq_pushinteger(v, spr(v)->fx.shade_level); return 1; }
 SQInteger get_shading_density(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.shade_density); return 1; }
 
+// setBlur(on, max, alpha, latency_ms, back): afterimages. off drops the recorded history; the latency is at least 16 ms.
+SQInteger set_blur(HSQUIRRELVM v) {
+	auto& b = spr(v)->blur;
+	b.on = arg_int(v, 2) != 0;
+	b.hist.clear();
+	if (!b.on) return 0;
+	const int max = static_cast<int>(arg_int(v, 3)), latency = static_cast<int>(arg_int(v, 5));
+	b.count = max != 0 ? max : 1;
+	b.alpha = arg_float(v, 4);
+	b.latency = latency > 15 ? latency : 16;
+	b.back = arg_int(v, 6) != 0;
+	return 0;
+}
+SQInteger set_blur_mode(HSQUIRRELVM v) { // 0: a ghost is skipped when equal to the next one, 1: when equal to the sprite
+	spr(v)->blur.mode = static_cast<int>(arg_int(v, 2));
+	return 0;
+}
+
 // Distortions (ripple / raster / lens): animated parameters, plain centre / angle / phase.
 SQInteger set_ripple(HSQUIRRELVM v) { // (x, y, power, frequency, speed, time, tempo)
 	auto& f = spr(v)->fx;
@@ -533,6 +551,8 @@ static void register_effect_methods(ScriptHost& h) {
 	h.add_method("setShadingParameter", set_shading_parameter);
 	h.add_method("getShadingLevel", get_shading_level);
 	h.add_method("getShadingDensity", get_shading_density);
+	h.add_method("setBlur", set_blur);
+	h.add_method("setBlurMode", set_blur_mode);
 	using E = Sprite::Effects;
 	h.add_method("setRipple", set_ripple);
 	h.add_method("getRippleCenter", get_ripple_center);
@@ -596,7 +616,7 @@ static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool 
 		h.add_method("serialize", target_true); // save files keep no native state: the scripts rebuild the surface
 		h.add_method("deserialize", target_true);
 		for (const char* n : {"setDelayRendering", "setCaptureTarget", "setCopyTarget", "createCustomEffect", "setCustomEffectParameter",
-							  "clear", "setBlurMode", "setTextureFiltering"})
+							  "clear", "setTextureFiltering"})
 			h.add_method(n, target_noop);
 	} else {
 		h.add_method("create", create);
