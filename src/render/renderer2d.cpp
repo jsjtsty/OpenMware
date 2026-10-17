@@ -242,6 +242,16 @@ void Renderer2D::destroy_dynamic_texture(Texture* t) {
 }
 
 namespace {
+// SDL_SavePNG resolves a relative path against the app's internal storage on Android, not against the working directory
+// (where the saves live and the thumbnails are read back from): hand it an absolute one.
+std::string absolute_path(const std::string& path) {
+	std::error_code ec;
+	const auto abs = std::filesystem::absolute(std::filesystem::u8path(path), ec);
+	if (ec) return path;
+	const auto u8 = abs.u8string();
+	return std::string(u8.begin(), u8.end());
+}
+
 bool read_disk_file(const std::string& path, std::vector<uint8_t>& out, long long* stamp) {
 	std::error_code ec;
 	const auto t = std::filesystem::last_write_time(std::filesystem::u8path(path), ec);
@@ -654,7 +664,7 @@ bool Renderer2D::save_frame_png(const DrawList& list, const std::string& path) {
 	SDL_ReleaseGPUFence(gpu_->device, fence);
 	void* data = SDL_MapGPUTransferBuffer(gpu_->device, tb, false);
 	SDL_Surface* surf = SDL_CreateSurfaceFrom(fw, fh, SDL_PIXELFORMAT_RGBA32, data, fw * 4);
-	const bool ok = SDL_SavePNG(surf, path.c_str());
+	const bool ok = SDL_SavePNG(surf, absolute_path(path).c_str());
 	SDL_DestroySurface(surf);
 	SDL_UnmapGPUTransferBuffer(gpu_->device, tb);
 	SDL_ReleaseGPUTransferBuffer(gpu_->device, tb);
@@ -682,7 +692,7 @@ bool Renderer2D::save_texture_png(Texture* t, int w, int h, const std::string& p
 	void* data = SDL_MapGPUTransferBuffer(gpu_->device, tb, false);
 	SDL_Surface* src = SDL_CreateSurfaceFrom(t->w, t->h, SDL_PIXELFORMAT_RGBA32, data, t->w * 4);
 	SDL_Surface* scaled = src ? SDL_ScaleSurface(src, w, h, SDL_SCALEMODE_LINEAR) : nullptr;
-	const bool ok = scaled && SDL_SavePNG(scaled, path.c_str());
+	const bool ok = scaled && SDL_SavePNG(scaled, absolute_path(path).c_str());
 	if (scaled) SDL_DestroySurface(scaled);
 	if (src) SDL_DestroySurface(src);
 	SDL_UnmapGPUTransferBuffer(gpu_->device, tb);
