@@ -1,0 +1,35 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    float4 g_DownSampleOffsetTmp[8];
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]], texture2d<float> Texture0 [[texture(0)]], sampler Sampler_Tex0 [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 _149 = ((((((((((((Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[0].xy)) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[0].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[1].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[1].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[2].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[2].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[3].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[3].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[4].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[4].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[5].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[5].zw))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[6].xy))) + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[6].zw));
+    float4 _157 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[7].xy));
+    float4 _164 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ConstantBuffer.g_DownSampleOffsetTmp[7].zw));
+    float4 _165 = (_149 + _157) + _164;
+    if (_165.w < 0.0)
+    {
+        discard_fragment();
+    }
+    out.out_var_SV_Target0 = _165 * 0.0625;
+    return out;
+}
+

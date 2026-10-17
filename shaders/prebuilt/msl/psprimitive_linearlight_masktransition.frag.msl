@@ -1,0 +1,25 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Mask [[texture(2)]], texture2d<float> Texture_TransitionMask [[texture(3)]], texture2d<float> Texture_TransitionRule [[texture(4)]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Mask [[sampler(2)]], sampler Sampler_TransitionMask [[sampler(3)]], sampler Sampler_TransitionRule [[sampler(4)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float2 _42 = in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w);
+    float4 _47 = in.in_var_COLOR0 * Texture_Mask.sample(Sampler_Mask, _42);
+    out.out_var_SV_Target = float4(fast::clamp((Texture_Destination.sample(Sampler_Destination, _42).xyz + (_47.xyz * 2.0)) - float3(1.0), float3(0.0), float3(1.0)), _47.w * Texture_TransitionRule.sample(Sampler_TransitionRule, float2(Texture_TransitionMask.sample(Sampler_TransitionMask, _42).x, 0.0)).z);
+    return out;
+}
+

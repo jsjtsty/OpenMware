@@ -14,7 +14,8 @@ else()
 endif()
 option(OMW_BUILD_TOOLS "Build the developer tools" ${_omw_tools_default})
 
-find_package(zstd CONFIG REQUIRED)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include(cmake/Dependencies.cmake) # SDL3, zstd, libwebp, stb, FFmpeg: fetched as source and built here
 
 # Squirrel 2.2.4 fork (32/64-bit bytecode ABI selectable at runtime via sq_open_ex).
 add_subdirectory(third_party/squirrel2 EXCLUDE_FROM_ALL)
@@ -28,8 +29,8 @@ add_library(omw_archive STATIC
 	src/archive/npk.cpp
 )
 target_include_directories(omw_archive PUBLIC src)
-target_link_libraries(omw_archive PUBLIC
-	$<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)
+target_link_libraries(omw_archive PUBLIC zstd::libzstd_static)
+target_include_directories(omw_archive PUBLIC "${zstd_SOURCE_DIR}/lib")
 
 if(OMW_BUILD_TOOLS)
 	add_executable(npktool tools/npktool.cpp)
@@ -37,11 +38,7 @@ if(OMW_BUILD_TOOLS)
 endif()
 
 # --- Rendering (SDL3 GPU) -----------------------------------------------------------------------
-find_package(SDL3 CONFIG REQUIRED)
 include(cmake/OmwShaders.cmake)
-
-find_package(WebP CONFIG REQUIRED)
-find_path(STB_INCLUDE_DIRS "stb_image.h" REQUIRED)
 
 add_library(omw_game STATIC src/script/easing.cpp src/game/anim.cpp src/game/text_markup.cpp src/game/input.cpp src/game/stage.cpp src/game/game_files.cpp)
 target_include_directories(omw_game PUBLIC src)
@@ -51,49 +48,14 @@ add_library(omw_audio STATIC src/audio/audio.cpp src/audio/vorbis_impl.cpp)
 target_include_directories(omw_audio PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(omw_audio PUBLIC omw_game SDL3::SDL3)
 
-find_package(FFMPEG REQUIRED)
 add_library(omw_video STATIC src/video/movie.cpp)
-target_include_directories(omw_video PUBLIC src PRIVATE ${FFMPEG_INCLUDE_DIRS})
-target_link_directories(omw_video PUBLIC ${FFMPEG_LIBRARY_DIRS})
-target_link_libraries(omw_video PUBLIC omw_audio ${FFMPEG_LIBRARIES})
+target_include_directories(omw_video PUBLIC src)
+target_link_libraries(omw_video PUBLIC omw_audio omw_ffmpeg)
 
 add_library(omw_render STATIC src/render/gpu.cpp src/render/renderer2d.cpp src/render/image.cpp src/render/text_raster.cpp)
 target_include_directories(omw_render PUBLIC src PRIVATE ${STB_INCLUDE_DIRS})
-target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webp)
-
-# Every 2D shader of the manifest (the 3D scene shaders are not used by the game scripts).
-# The define lists contain ';', so rows are split by hand (file(STRINGS) would break them into list elements).
-file(READ ${PROJECT_SOURCE_DIR}/shaders/hlsl/manifest.tsv _omw_manifest)
-string(REPLACE ";" "|" _omw_manifest "${_omw_manifest}")
-string(REPLACE "\r" "" _omw_manifest "${_omw_manifest}")
-string(REPLACE "\n" ";" _omw_shader_rows "${_omw_manifest}")
-list(POP_FRONT _omw_shader_rows) # header
-foreach(_row IN LISTS _omw_shader_rows)
-	if(_row MATCHES "^([^	]+)	([^	]+)	(.*)$")
-		set(_name "${CMAKE_MATCH_1}")
-		set(_file "${CMAKE_MATCH_2}")
-		string(REPLACE "|" ";" _defs "${CMAKE_MATCH_3}")
-		if(_name MATCHES "^scene/" OR _file MATCHES "^scene/" OR _name MATCHES "^gs")
-			continue()
-		endif()
-		string(REGEX REPLACE "^.*/" "" _base "${_name}")
-		if(_base MATCHES "^vs")
-			set(_stage vertex)
-			set(_ext vert)
-		else()
-			set(_stage fragment)
-			set(_ext frag)
-		endif()
-		omw_add_shader(NAME ${_base}.${_ext} STAGE ${_stage} SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/${_file} DEFINES ${_defs})
-	endif()
-endforeach()
-# OpenMware's own sprite effect shaders (blur, colour adjustments).
-omw_add_shader(NAME psfx_blur.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_BLUR)
-omw_add_shader(NAME psfx_color.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_COLOR)
-omw_add_shader(NAME psfx_warp.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_WARP)
-if(NOT OMW_PREBUILT_SHADERS)
-	add_custom_target(omw_shaders DEPENDS ${_omw_all_shader_outputs})
-endif()
+target_include_directories(omw_render PRIVATE "${OMW_WEBP_INCLUDE_DIR}")
+target_link_libraries(omw_render PUBLIC omw_game SDL3::SDL3 PRIVATE WebP::webpdecoder)
 
 if(OMW_BUILD_TOOLS)
 	add_executable(gpu_demo apps/gpu_demo.cpp)
@@ -129,6 +91,9 @@ else()
 endif()
 target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
 add_dependencies(omw omw_shaders)
+if(OMW_FFMPEG_DLLS) # only with OMW_FFMPEG_ROOT pointing at a shared FFmpeg
+	add_custom_command(TARGET omw POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:omw>)
+endif()
 
 if(APPLE)
 	set_target_properties(omw PROPERTIES

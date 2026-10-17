@@ -1,0 +1,85 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+    float4 in_var_TEXCOORD2 [[user(locn2)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Tex0 [[texture(0)]], texture2d<float> Texture_Params [[texture(1)]], sampler Sampler_Tex0 [[sampler(0)]])
+{
+    main0_out out = {};
+    if ((in.in_var_COLOR0.w + 1000.0) < 0.0)
+    {
+        discard_fragment();
+    }
+    if ((in.in_var_TEXCOORD2.w + 1000.0) < 0.0)
+    {
+        discard_fragment();
+    }
+    float4 _60 = Texture_Params.read(uint2(int2(0)), 0);
+    float4 _62 = Texture_Params.read(uint2(int2(1, 0)), 0);
+    float4 _66 = Texture_Params.read(uint2(int2(3, 0)), 0);
+    float2 _68 = _66.xy;
+    float2 _69 = _66.zw - _68;
+    float2 _72 = Texture_Params.read(uint2(int2(2, 0)), 0).xy;
+    float2 _73 = ((in.in_var_TEXCOORD0 - _68) / _69) * _72;
+    float2 _77 = ((_60.yz - _68) / _69) * _72;
+    float _78 = _60.x;
+    float2 _140;
+    if (_78 < 0.5)
+    {
+        float2 _83 = _73 - _77;
+        float _84 = length(_83);
+        float2 _91;
+        if (_84 > 0.0)
+        {
+            _91 = _83 / float2(_84);
+        }
+        else
+        {
+            _91 = float2(0.0);
+        }
+        _140 = (_91 * (_62.x * 0.100000001490116119384765625)) * sin(((_84 * _62.y) * 6.28318521194159984588623046875e-05) - _62.z);
+    }
+    else
+    {
+        float2 _139;
+        if (_78 < 1.5)
+        {
+            float2 _106 = _73 - _77;
+            float _110 = length(_106) / precise::max(_62.w, 1.0);
+            float2 _121;
+            if (_110 < 1.0)
+            {
+                float _118 = 1.0 - _110;
+                _121 = (((-_106) * (_62.x * 0.001000000047497451305389404296875)) * _118) * _118;
+            }
+            else
+            {
+                _121 = float2(0.0);
+            }
+            _139 = _121;
+        }
+        else
+        {
+            float _122 = _62.w;
+            float _123 = cos(_122);
+            float _124 = sin(_122);
+            _139 = (float2(_123, _124) * (_62.x * 0.100000001490116119384765625)) * sin(((dot(_73, float2(-_124, _123)) * _62.y) * 6.28318521194159984588623046875e-05) - _62.z);
+        }
+        _140 = _139;
+    }
+    out.out_var_SV_Target = Texture_Tex0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + ((_140 / _72) * _69)));
+    return out;
+}
+

@@ -1,0 +1,51 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    uint g_UseColor_Override;
+    float4 g_Color_Override;
+    float g_Color_OverrideAlphaExponent;
+    float4 g_ColorBalance;
+    float4 g_Offset;
+    float4x4 g_mT;
+};
+
+struct main0_out
+{
+    float4 out_var_COLOR0 [[user(locn0)]];
+    float4 out_var_TEXCOORD2 [[user(locn1)]];
+    float4 gl_Position [[position]];
+};
+
+struct main0_in
+{
+    float4 in_var_POSITION0 [[attribute(0)]];
+    float4 in_var_COLOR0 [[attribute(1)]];
+};
+
+vertex main0_out main0(main0_in in [[stage_in]], constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]])
+{
+    main0_out out = {};
+    float2 _42 = in.in_var_POSITION0.xy + ConstantBuffer.g_Offset.xy;
+    float _43 = _42.x;
+    float4 _53 = in.in_var_COLOR0 * ConstantBuffer.g_ColorBalance;
+    float4 _74;
+    if (ConstantBuffer.g_UseColor_Override != 0u)
+    {
+        float4 _61 = float4(ConstantBuffer.g_Color_Override.x, ConstantBuffer.g_Color_Override.y, ConstantBuffer.g_Color_Override.z, _53.w);
+        _61.w = exp2(log2(abs(in.in_var_COLOR0.w)) * ConstantBuffer.g_Color_OverrideAlphaExponent) * ConstantBuffer.g_Color_Override.w;
+        _74 = _61;
+    }
+    else
+    {
+        _74 = _53;
+    }
+    out.gl_Position = float4(_43, _42.y, 0.0, in.in_var_POSITION0.w);
+    out.out_var_COLOR0 = _74;
+    out.out_var_TEXCOORD2 = float4(_43, _42.y, in.in_var_POSITION0.zw) * ConstantBuffer.g_mT;
+    return out;
+}
+

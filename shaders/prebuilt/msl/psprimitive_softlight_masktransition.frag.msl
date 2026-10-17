@@ -1,0 +1,60 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Mask [[texture(2)]], texture2d<float> Texture_TransitionMask [[texture(3)]], texture2d<float> Texture_TransitionRule [[texture(4)]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Mask [[sampler(2)]], sampler Sampler_TransitionMask [[sampler(3)]], sampler Sampler_TransitionRule [[sampler(4)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float2 _44 = in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w);
+    float4 _48 = Texture_Mask.sample(Sampler_Mask, _44);
+    float4 _49 = in.in_var_COLOR0 * _48;
+    float4 _53 = Texture_TransitionMask.sample(Sampler_TransitionMask, _44);
+    float4 _59 = Texture_TransitionRule.sample(Sampler_TransitionRule, float2(_53.x, 0.0));
+    float4 _66 = Texture_Destination.sample(Sampler_Destination, _44);
+    float3 _67 = _49.xyz;
+    float3 _70 = log2(abs(_66.xyz));
+    float3 _74 = exp2(_70 * ((float3(1.0) - _67) * 2.0));
+    float3 _77 = exp2(_70 * (float3(0.5) / _67));
+    float _85;
+    if (_49.x < 0.5)
+    {
+        _85 = _74.x;
+    }
+    else
+    {
+        _85 = _77.x;
+    }
+    float _93;
+    if (_49.y < 0.5)
+    {
+        _93 = _74.y;
+    }
+    else
+    {
+        _93 = _77.y;
+    }
+    float _101;
+    if (_49.z < 0.5)
+    {
+        _101 = _74.z;
+    }
+    else
+    {
+        _101 = _77.z;
+    }
+    out.out_var_SV_Target = float4(_85, _93, _101, _49.w * _59.z);
+    return out;
+}
+

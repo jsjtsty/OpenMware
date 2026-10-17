@@ -1,0 +1,129 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Mask [[texture(2)]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Mask [[sampler(2)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float2 _38 = in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w);
+    float4 _42 = Texture_Mask.sample(Sampler_Mask, _38);
+    float4 _43 = in.in_var_COLOR0 * _42;
+    float4 _47 = Texture_Destination.sample(Sampler_Destination, _38);
+    float _48 = _43.x;
+    float _49 = _47.x;
+    float _72;
+    do
+    {
+        if (_48 < 0.5)
+        {
+            float _55 = 2.0 * _48;
+            float _56 = 1.0 - _55;
+            float _63;
+            if (_56 >= _49)
+            {
+                _63 = 0.0;
+            }
+            else
+            {
+                _63 = (_49 - _56) / _55;
+            }
+            _72 = _63;
+            break;
+        }
+        float _65 = 2.0 - (2.0 * _48);
+        float _71;
+        if (_49 < _65)
+        {
+            _71 = _49 / _65;
+        }
+        else
+        {
+            _71 = 1.0;
+        }
+        _72 = _71;
+        break;
+    } while(false);
+    float _73 = _43.y;
+    float _74 = _47.y;
+    float _97;
+    do
+    {
+        if (_73 < 0.5)
+        {
+            float _80 = 2.0 * _73;
+            float _81 = 1.0 - _80;
+            float _88;
+            if (_81 >= _74)
+            {
+                _88 = 0.0;
+            }
+            else
+            {
+                _88 = (_74 - _81) / _80;
+            }
+            _97 = _88;
+            break;
+        }
+        float _90 = 2.0 - (2.0 * _73);
+        float _96;
+        if (_74 < _90)
+        {
+            _96 = _74 / _90;
+        }
+        else
+        {
+            _96 = 1.0;
+        }
+        _97 = _96;
+        break;
+    } while(false);
+    float _98 = _43.z;
+    float _99 = _47.z;
+    float _122;
+    do
+    {
+        if (_98 < 0.5)
+        {
+            float _105 = 2.0 * _98;
+            float _106 = 1.0 - _105;
+            float _113;
+            if (_106 >= _99)
+            {
+                _113 = 0.0;
+            }
+            else
+            {
+                _113 = (_99 - _106) / _105;
+            }
+            _122 = _113;
+            break;
+        }
+        float _115 = 2.0 - (2.0 * _98);
+        float _121;
+        if (_99 < _115)
+        {
+            _121 = _99 / _115;
+        }
+        else
+        {
+            _121 = 1.0;
+        }
+        _122 = _121;
+        break;
+    } while(false);
+    out.out_var_SV_Target = float4(_72, _97, _122, _43.w);
+    return out;
+}
+

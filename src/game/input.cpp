@@ -1,6 +1,7 @@
 #include "game/input.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace omw {
 namespace {

@@ -1,0 +1,30 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    float g_SepiaPower;
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]], texture2d<float> Texture0 [[texture(0)]], sampler Sampler_Tex0 [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 _38 = Texture0.sample(Sampler_Tex0, in.in_var_TEXCOORD0);
+    float3 _39 = _38.xyz;
+    float3 _46 = mix(_39, float3(dot(_39, float3(0.114000000059604644775390625, 0.58700001239776611328125, 0.2989999949932098388671875))) + float3(0.117646999657154083251953125, 0.117646999657154083251953125, 0.0), float3(ConstantBuffer.g_SepiaPower));
+    out.out_var_SV_Target0 = float4(_46.x, _46.y, _46.z, _38.w);
+    return out;
+}
+

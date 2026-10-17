@@ -1,0 +1,25 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    float g_ToneMappingDarkClamp;
+    float g_ToneMappingLightClamp;
+    float g_ToneMappingBias;
+    float4 g_DownSampleOffset[16];
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+fragment main0_out main0(constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]], texture2d<float> Texture0 [[texture(0)]], sampler Sampler_Tex0 [[sampler(0)]], sampler Sampler_Tex1 [[sampler(1)]])
+{
+    main0_out out = {};
+    out.out_var_SV_Target0 = mix(Texture0.sample(Sampler_Tex0, float2(0.5)), Texture0.sample(Sampler_Tex1, float2(0.5)), float4(1.0 - exp2(ConstantBuffer.g_ToneMappingBias * (-0.02914634533226490020751953125))));
+    return out;
+}
+

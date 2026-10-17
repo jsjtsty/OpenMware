@@ -1,0 +1,196 @@
+name: Build
+
+# Builds the engine for every platform (no game data is involved or shipped). All third-party code (SDL3, zstd, libwebp,
+# stb, FFmpeg) is fetched as source and compiled by CMake, see cmake/Dependencies.cmake and cmake/FFmpeg.cmake; the shaders
+# are the checked-in ones under shaders/prebuilt.
+#   windows  OpenMware zip (Vulkan + Direct3D 12)
+#   macos    OpenMware.app (Metal), ad-hoc signed
+#   android  OpenMware debug APK (Vulkan), arm64-v8a
+#   ios      unsigned OpenMware.ipa for arm64 devices (Metal)
+# Only the Windows build has been run before this file was written: expect to iterate on the others.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # FFmpeg's configure/make needs a POSIX shell; MSYS2 only provides the shell, make and nasm, MSVC compiles.
+      - uses: msys2/setup-msys2@v2
+        id: msys
+        with:
+          msystem: MSYS
+          update: false
+          install: make diffutils nasm
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Keep MSYS2's link.exe from shadowing MSVC's
+        shell: pwsh
+        run: |
+          $root = '${{ steps.msys.outputs.msys2-location }}'
+          Rename-Item "$root/usr/bin/link.exe" link.exe.bak -ErrorAction SilentlyContinue
+          "OMW_MSYS2_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: build/test_easing.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = 'dist/OpenMware-windows-x64'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Copy-Item build/omw.exe, build/npktool.exe $out
+          # Windows GPUs take SPIR-V (Vulkan) or DXIL (Direct3D 12); both sets were copied next to the executable.
+          Copy-Item -Recurse build/shaders "$out/shaders"
+          Copy-Item docs/running.md "$out/README.md"
+          Compress-Archive -Path "$out/*" -DestinationPath dist/OpenMware-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenMware-windows-x64
+          path: dist/OpenMware-windows-x64.zip
+
+  macos:
+    name: macOS arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools
+        run: brew install ninja
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=arm64
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+
+      - name: Build
+        run: cmake --build build --target omw
+
+      - name: Test
+        run: cmake --build build --target test_easing && build/test_easing
+
+      - name: Sign (ad hoc) and package
+        run: |
+          codesign --force --deep --sign - build/omw.app
+          mkdir -p dist
+          ditto -c -k --keepParent build/omw.app dist/OpenMware-macos-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenMware-macos-arm64
+          path: dist/OpenMware-macos-arm64.zip
+
+  android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure
+        run: |
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26
+
+      - name: Build libmain.so and libSDL3.so
+        run: cmake --build build --target omw
+
+      - name: Assemble the APK
+        run: |
+          bash scripts/android/prepare_project.sh build
+          gradle --no-daemon -p android assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenMware-android-arm64
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    name: iOS arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Xcode
+          -DCMAKE_SYSTEM_NAME=iOS
+          -DCMAKE_OSX_SYSROOT=iphoneos
+          -DCMAKE_OSX_ARCHITECTURES=arm64
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
+
+      - name: Build (unsigned)
+        run: >
+          cmake --build build --config Release --target omw --
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Package an unsigned IPA
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/Release-iphoneos/omw.app dist/Payload/
+          (cd dist && zip -qry OpenMware-ios-arm64-unsigned.ipa Payload)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenMware-ios-arm64
+          path: dist/OpenMware-ios-arm64-unsigned.ipa
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: OpenMware-*
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

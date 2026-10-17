@@ -1,0 +1,123 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float4 _40 = Texture_Destination.sample(Sampler_Destination, (in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w)));
+    float _42 = _40.x;
+    float _65;
+    do
+    {
+        if (in.in_var_COLOR0.x < 0.5)
+        {
+            float _48 = 2.0 * in.in_var_COLOR0.x;
+            float _49 = 1.0 - _48;
+            float _56;
+            if (_49 >= _42)
+            {
+                _56 = 0.0;
+            }
+            else
+            {
+                _56 = (_42 - _49) / _48;
+            }
+            _65 = _56;
+            break;
+        }
+        float _58 = 2.0 - (2.0 * in.in_var_COLOR0.x);
+        float _64;
+        if (_42 < _58)
+        {
+            _64 = _42 / _58;
+        }
+        else
+        {
+            _64 = 1.0;
+        }
+        _65 = _64;
+        break;
+    } while(false);
+    float _67 = _40.y;
+    float _90;
+    do
+    {
+        if (in.in_var_COLOR0.y < 0.5)
+        {
+            float _73 = 2.0 * in.in_var_COLOR0.y;
+            float _74 = 1.0 - _73;
+            float _81;
+            if (_74 >= _67)
+            {
+                _81 = 0.0;
+            }
+            else
+            {
+                _81 = (_67 - _74) / _73;
+            }
+            _90 = _81;
+            break;
+        }
+        float _83 = 2.0 - (2.0 * in.in_var_COLOR0.y);
+        float _89;
+        if (_67 < _83)
+        {
+            _89 = _67 / _83;
+        }
+        else
+        {
+            _89 = 1.0;
+        }
+        _90 = _89;
+        break;
+    } while(false);
+    float _92 = _40.z;
+    float _115;
+    do
+    {
+        if (in.in_var_COLOR0.z < 0.5)
+        {
+            float _98 = 2.0 * in.in_var_COLOR0.z;
+            float _99 = 1.0 - _98;
+            float _106;
+            if (_99 >= _92)
+            {
+                _106 = 0.0;
+            }
+            else
+            {
+                _106 = (_92 - _99) / _98;
+            }
+            _115 = _106;
+            break;
+        }
+        float _108 = 2.0 - (2.0 * in.in_var_COLOR0.z);
+        float _114;
+        if (_92 < _108)
+        {
+            _114 = _92 / _108;
+        }
+        else
+        {
+            _114 = 1.0;
+        }
+        _115 = _114;
+        break;
+    } while(false);
+    out.out_var_SV_Target = float4(_65, _90, _115, in.in_var_COLOR0.w);
+    return out;
+}
+

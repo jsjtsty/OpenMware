@@ -1,0 +1,163 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    float g_Shift_Hue;
+    float g_Shift_Saturation;
+    float g_Shift_Value;
+    float g_Shift_Glow;
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]], texture2d<float> Texture0 [[texture(0)]], sampler Sampler_Tex0 [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 _43 = Texture0.sample(Sampler_Tex0, in.in_var_TEXCOORD0);
+    float _44 = _43.x;
+    float _45 = _43.y;
+    float _46 = _43.z;
+    float _48 = precise::max(_44, precise::max(_45, _46));
+    float _51 = _48 - precise::min(_44, precise::min(_45, _46));
+    float _69;
+    if (_44 == _48)
+    {
+        _69 = (_45 - _46) / _51;
+    }
+    else
+    {
+        float _68;
+        if (_45 == _48)
+        {
+            _68 = 2.0 + ((_46 - _44) / _51);
+        }
+        else
+        {
+            _68 = 4.0 + ((_44 - _45) / _51);
+        }
+        _69 = _68;
+    }
+    float _77;
+    if (_69 < 0.0)
+    {
+        _77 = (_69 * 0.16666667163372039794921875) + 1.0;
+    }
+    else
+    {
+        _77 = _69 * 0.16666667163372039794921875;
+    }
+    float _84;
+    if (_48 != 0.0)
+    {
+        _84 = _51 / _48;
+    }
+    else
+    {
+        _84 = 0.0;
+    }
+    float _89 = fast::clamp(fast::clamp(_84, 0.0, 1.0) + ConstantBuffer.g_Shift_Saturation, 0.0, 1.0);
+    float _91 = _43.w;
+    float _95 = fast::clamp(_48, 0.0, 1.0) + (_91 * ConstantBuffer.g_Shift_Glow);
+    float3 _163;
+    if (_89 == 0.0)
+    {
+        _163 = float3(_95);
+    }
+    else
+    {
+        float _103 = fast::clamp(_77, 0.0, 1.0) + ConstantBuffer.g_Shift_Hue;
+        float _114;
+        if (_103 >= 1.0)
+        {
+            _114 = _103 - 1.0;
+        }
+        else
+        {
+            float _113;
+            if (_103 <= 0.0)
+            {
+                _113 = _103 + 1.0;
+            }
+            else
+            {
+                _113 = _103;
+            }
+            _114 = _113;
+        }
+        float _119;
+        if (_114 >= 1.0)
+        {
+            _119 = _114 - 1.0;
+        }
+        else
+        {
+            _119 = _114;
+        }
+        float _120 = _119 * 6.0;
+        float _121 = floor(_120);
+        float _122 = _120 - _121;
+        float _124 = _95 * (1.0 - _89);
+        float _127 = _95 * (1.0 - (_89 * _122));
+        float _131 = _95 * (1.0 - (_89 * (1.0 - _122)));
+        float3 _162;
+        if (_121 < 1.0)
+        {
+            _162 = float3(_95, _131, _124);
+        }
+        else
+        {
+            float3 _161;
+            if (_121 < 2.0)
+            {
+                _161 = float3(_127, _95, _124);
+            }
+            else
+            {
+                float3 _160;
+                if (_121 < 3.0)
+                {
+                    _160 = float3(_124, _95, _131);
+                }
+                else
+                {
+                    float3 _159;
+                    if (_121 < 4.0)
+                    {
+                        _159 = float3(_124, _127, _95);
+                    }
+                    else
+                    {
+                        float3 _158;
+                        if (_121 < 5.0)
+                        {
+                            _158 = float3(_131, _124, _95);
+                        }
+                        else
+                        {
+                            _158 = float3(_95, _124, _127);
+                        }
+                        _159 = _158;
+                    }
+                    _160 = _159;
+                }
+                _161 = _160;
+            }
+            _162 = _161;
+        }
+        _163 = _162;
+    }
+    out.out_var_SV_Target0 = float4(_163 + float3(ConstantBuffer.g_Shift_Value), _91);
+    return out;
+}
+

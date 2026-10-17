@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.openmware.omw'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.openmware.omw'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    sourceSets {
+        main {
+            // src/sdl-java: SDL's Java classes, copied from the SDL release matching the vcpkg SDL3 by
+            // scripts/android/prepare_project.sh. jniLibs and assets are filled by the same script (libmain.so,
+            // libSDL3.so, the Vulkan shaders).
+            java.srcDirs = ['src/main/java', 'src/sdl-java']
+            jniLibs.srcDirs = ['src/main/jniLibs']
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}

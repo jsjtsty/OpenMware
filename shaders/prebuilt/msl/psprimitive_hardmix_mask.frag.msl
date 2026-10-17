@@ -1,0 +1,29 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Mask [[texture(2)]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Mask [[sampler(2)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float2 _35 = in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w);
+    float4 _40 = in.in_var_COLOR0 * Texture_Mask.sample(Sampler_Mask, _35);
+    float3 _47 = _40.xyz + Texture_Destination.sample(Sampler_Destination, _35).xyz;
+    float _48 = _47.x;
+    float _51 = _47.y;
+    float _54 = _47.z;
+    out.out_var_SV_Target = float4((_48 < 1.0) ? 0.0 : _48, (_51 < 1.0) ? 0.0 : _51, (_54 < 1.0) ? 0.0 : _54, _40.w);
+    return out;
+}
+

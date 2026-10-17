@@ -1,0 +1,58 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float4 in_var_TEXCOORD2 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Mask [[texture(2)]], texture2d<float> Texture_Destination [[texture(7)]], sampler Sampler_Mask [[sampler(2)]], sampler Sampler_Destination [[sampler(7)]])
+{
+    main0_out out = {};
+    float2 _39 = in.in_var_TEXCOORD2.xy / float2(in.in_var_TEXCOORD2.w);
+    float4 _43 = Texture_Mask.sample(Sampler_Mask, _39);
+    float4 _44 = in.in_var_COLOR0 * _43;
+    float4 _48 = Texture_Destination.sample(Sampler_Destination, _39);
+    float3 _49 = _44.xyz;
+    float3 _52 = log2(abs(_48.xyz));
+    float3 _56 = exp2(_52 * ((float3(1.0) - _49) * 2.0));
+    float3 _59 = exp2(_52 * (float3(0.5) / _49));
+    float _67;
+    if (_44.x < 0.5)
+    {
+        _67 = _56.x;
+    }
+    else
+    {
+        _67 = _59.x;
+    }
+    float _75;
+    if (_44.y < 0.5)
+    {
+        _75 = _56.y;
+    }
+    else
+    {
+        _75 = _59.y;
+    }
+    float _83;
+    if (_44.z < 0.5)
+    {
+        _83 = _56.z;
+    }
+    else
+    {
+        _83 = _59.z;
+    }
+    out.out_var_SV_Target = float4(_67, _75, _83, _44.w);
+    return out;
+}
+

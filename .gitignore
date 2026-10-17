@@ -9,3 +9,12 @@ libtotono/
 *.pdb
 *.ilk
 __pycache__/
+
+save/
+temp/
+android/.gradle/
+android/app/build/
+android/app/src/sdl-java/
+android/app/src/main/jniLibs/
+android/app/src/main/assets/
+android/local.properties

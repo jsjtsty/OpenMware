@@ -1,0 +1,217 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ConstantBuffer
+{
+    float g_DOF_Middle;
+    float g_DOF_Far;
+    float g_DOF_Lange;
+    float4 g_GaussianBlurWeight[8];
+    float4x4 g_GaussianBlurOffsetMatrix;
+    float4x4 g_GaussianBlurShiftMatrix;
+};
+
+struct main0_out
+{
+    float4 out_var_SV_Target0 [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant type_ConstantBuffer& ConstantBuffer [[buffer(0)]], texture2d<float> Texture0 [[texture(0)]], sampler Sampler_Tex0 [[sampler(0)]], sampler Sampler_Tex3 [[sampler(3)]])
+{
+    main0_out out = {};
+    float4 _470;
+    do
+    {
+        float4 _49 = Texture0.sample(Sampler_Tex3, in.in_var_TEXCOORD0);
+        float _50 = _49.x;
+        if (_50 <= ConstantBuffer.g_DOF_Middle)
+        {
+            _470 = Texture0.sample(Sampler_Tex0, in.in_var_TEXCOORD0);
+            break;
+        }
+        bool _62 = _50 <= ConstantBuffer.g_DOF_Far;
+        float4 _69 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]) + float4(ConstantBuffer.g_GaussianBlurShiftMatrix[0][0], ConstantBuffer.g_GaussianBlurShiftMatrix[1][0], ConstantBuffer.g_GaussianBlurShiftMatrix[2][0], ConstantBuffer.g_GaussianBlurShiftMatrix[3][0]);
+        float4 _72 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]) + float4(ConstantBuffer.g_GaussianBlurShiftMatrix[0][1], ConstantBuffer.g_GaussianBlurShiftMatrix[1][1], ConstantBuffer.g_GaussianBlurShiftMatrix[2][1], ConstantBuffer.g_GaussianBlurShiftMatrix[3][1]);
+        float4 _75 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]) + float4(ConstantBuffer.g_GaussianBlurShiftMatrix[0][2], ConstantBuffer.g_GaussianBlurShiftMatrix[1][2], ConstantBuffer.g_GaussianBlurShiftMatrix[2][2], ConstantBuffer.g_GaussianBlurShiftMatrix[3][2]);
+        float4 _78 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]) + float4(ConstantBuffer.g_GaussianBlurShiftMatrix[0][3], ConstantBuffer.g_GaussianBlurShiftMatrix[1][3], ConstantBuffer.g_GaussianBlurShiftMatrix[2][3], ConstantBuffer.g_GaussianBlurShiftMatrix[3][3]);
+        float2 _95;
+        if (_62)
+        {
+            _95 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).xy * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).xy)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _95 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).xy;
+        }
+        float4 _100 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _95));
+        float2 _101 = _78.zw;
+        float2 _117;
+        if (_62)
+        {
+            _117 = _101 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _101)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _117 = _101;
+        }
+        float4 _122 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _117));
+        float2 _140;
+        if (_62)
+        {
+            _140 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).zw * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).zw)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _140 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][0], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][0]).zw;
+        }
+        float4 _145 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _140));
+        float2 _146 = _78.xy;
+        float2 _162;
+        if (_62)
+        {
+            _162 = _146 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _146)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _162 = _146;
+        }
+        float4 _167 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _162));
+        float2 _192;
+        if (_62)
+        {
+            _192 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).xy * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).xy)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _192 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).xy;
+        }
+        float4 _197 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _192));
+        float2 _198 = _75.zw;
+        float2 _214;
+        if (_62)
+        {
+            _214 = _198 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _198)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _214 = _198;
+        }
+        float4 _219 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _214));
+        float2 _237;
+        if (_62)
+        {
+            _237 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).zw * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).zw)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _237 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][1], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][1]).zw;
+        }
+        float4 _242 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _237));
+        float2 _243 = _75.xy;
+        float2 _259;
+        if (_62)
+        {
+            _259 = _243 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _243)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _259 = _243;
+        }
+        float4 _264 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _259));
+        float2 _290;
+        if (_62)
+        {
+            _290 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).xy * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).xy)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _290 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).xy;
+        }
+        float4 _295 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _290));
+        float2 _296 = _72.zw;
+        float2 _312;
+        if (_62)
+        {
+            _312 = _296 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _296)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _312 = _296;
+        }
+        float4 _317 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _312));
+        float2 _335;
+        if (_62)
+        {
+            _335 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).zw * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).zw)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _335 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][2], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][2]).zw;
+        }
+        float4 _340 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _335));
+        float2 _341 = _72.xy;
+        float2 _357;
+        if (_62)
+        {
+            _357 = _341 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _341)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _357 = _341;
+        }
+        float4 _362 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _357));
+        float2 _388;
+        if (_62)
+        {
+            _388 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).xy * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).xy)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _388 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).xy;
+        }
+        float4 _393 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _388));
+        float2 _394 = _69.zw;
+        float2 _410;
+        if (_62)
+        {
+            _410 = _394 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _394)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _410 = _394;
+        }
+        float4 _415 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _410));
+        float2 _433;
+        if (_62)
+        {
+            _433 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).zw * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).zw)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _433 = float4(ConstantBuffer.g_GaussianBlurOffsetMatrix[0][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[1][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[2][3], ConstantBuffer.g_GaussianBlurOffsetMatrix[3][3]).zw;
+        }
+        float4 _438 = Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _433));
+        float2 _439 = _69.xy;
+        float2 _455;
+        if (_62)
+        {
+            _455 = _439 * float2(0.0, fast::clamp((Texture0.sample(Sampler_Tex3, (in.in_var_TEXCOORD0 + _439)).x - ConstantBuffer.g_DOF_Middle) / ConstantBuffer.g_DOF_Lange, 0.0, 1.0));
+        }
+        else
+        {
+            _455 = _439;
+        }
+        _470 = ((((((((_100 + _122) * ConstantBuffer.g_GaussianBlurWeight[0].x) + ((_145 + _167) * ConstantBuffer.g_GaussianBlurWeight[1].x)) + ((_197 + _219) * ConstantBuffer.g_GaussianBlurWeight[2].x)) + ((_242 + _264) * ConstantBuffer.g_GaussianBlurWeight[3].x)) + ((_295 + _317) * ConstantBuffer.g_GaussianBlurWeight[4].x)) + ((_340 + _362) * ConstantBuffer.g_GaussianBlurWeight[5].x)) + ((_393 + _415) * ConstantBuffer.g_GaussianBlurWeight[6].x)) + ((_438 + Texture0.sample(Sampler_Tex0, (in.in_var_TEXCOORD0 + _455))) * ConstantBuffer.g_GaussianBlurWeight[7].x);
+        break;
+    } while(false);
+    out.out_var_SV_Target0 = _470;
+    return out;
+}
+

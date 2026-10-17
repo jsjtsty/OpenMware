@@ -1,0 +1,185 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct main0_out
+{
+    float4 out_var_SV_Target [[color(0)]];
+};
+
+struct main0_in
+{
+    float4 in_var_COLOR0 [[user(locn0)]];
+    float2 in_var_TEXCOORD0 [[user(locn1)]];
+    float4 in_var_TEXCOORD2 [[user(locn2)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> Texture_Tex0 [[texture(0)]], texture2d<float> Texture_Params [[texture(1)]], sampler Sampler_Tex0 [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 _240;
+    do
+    {
+        if ((in.in_var_COLOR0.w + 1000.0) < 0.0)
+        {
+            discard_fragment();
+        }
+        if ((in.in_var_TEXCOORD2.w + 1000.0) < 0.0)
+        {
+            discard_fragment();
+        }
+        float4 _80 = Texture_Params.read(uint2(int2(0)), 0);
+        float4 _82 = Texture_Params.read(uint2(int2(1, 0)), 0);
+        float4 _84 = Texture_Params.read(uint2(int2(2, 0)), 0);
+        float4 _88 = Texture_Tex0.sample(Sampler_Tex0, in.in_var_TEXCOORD0);
+        float _89 = _88.w;
+        if (_89 <= 0.0)
+        {
+            _240 = float4(0.0);
+            break;
+        }
+        float3 _96 = fast::clamp(_88.xyz / float3(_89), float3(0.0), float3(1.0));
+        float _97 = _80.x;
+        bool _103;
+        if ((isunordered(_97, 0.0) || _97 == 0.0))
+        {
+            _103 = _80.y != 0.0;
+        }
+        else
+        {
+            _103 = true;
+        }
+        bool _109;
+        if (!_103)
+        {
+            _109 = _80.w != 0.0;
+        }
+        else
+        {
+            _109 = true;
+        }
+        float3 _207;
+        if (_109)
+        {
+            float _112 = _96.x;
+            float _113 = _96.y;
+            float _114 = _96.z;
+            float _116 = precise::max(_112, precise::max(_113, _114));
+            float _119 = _116 - precise::min(_112, precise::min(_113, _114));
+            float _149;
+            if (_119 > 0.0)
+            {
+                float _140;
+                if (_112 == _116)
+                {
+                    _140 = (_113 - _114) / _119;
+                }
+                else
+                {
+                    float _139;
+                    if (_113 == _116)
+                    {
+                        _139 = 2.0 + ((_114 - _112) / _119);
+                    }
+                    else
+                    {
+                        _139 = 4.0 + ((_112 - _113) / _119);
+                    }
+                    _140 = _139;
+                }
+                float _148;
+                if (_140 < 0.0)
+                {
+                    _148 = (_140 * 0.16666667163372039794921875) + 1.0;
+                }
+                else
+                {
+                    _148 = _140 * 0.16666667163372039794921875;
+                }
+                _149 = _148;
+            }
+            else
+            {
+                _149 = 0.0;
+            }
+            float _155;
+            if (_116 != 0.0)
+            {
+                _155 = _119 / _116;
+            }
+            else
+            {
+                _155 = 0.0;
+            }
+            float _158 = fast::clamp(_155 + _80.y, 0.0, 1.0);
+            float _161 = fast::clamp(_116 + _80.w, 0.0, 1.0);
+            float _164 = fract(_149 + _97) * 6.0;
+            float _165 = floor(_164);
+            float _166 = _164 - _165;
+            float _168 = _161 * (1.0 - _158);
+            float _171 = _161 * (1.0 - (_158 * _166));
+            float _175 = _161 * (1.0 - (_158 * (1.0 - _166)));
+            float3 _206;
+            if (_165 < 1.0)
+            {
+                _206 = float3(_161, _175, _168);
+            }
+            else
+            {
+                float3 _205;
+                if (_165 < 2.0)
+                {
+                    _205 = float3(_171, _161, _168);
+                }
+                else
+                {
+                    float3 _204;
+                    if (_165 < 3.0)
+                    {
+                        _204 = float3(_168, _161, _175);
+                    }
+                    else
+                    {
+                        float3 _203;
+                        if (_165 < 4.0)
+                        {
+                            _203 = float3(_168, _171, _161);
+                        }
+                        else
+                        {
+                            float3 _202;
+                            if (_165 < 5.0)
+                            {
+                                _202 = float3(_175, _168, _161);
+                            }
+                            else
+                            {
+                                _202 = float3(_161, _168, _171);
+                            }
+                            _203 = _202;
+                        }
+                        _204 = _203;
+                    }
+                    _205 = _204;
+                }
+                _206 = _205;
+            }
+            _207 = _206;
+        }
+        else
+        {
+            _207 = _96;
+        }
+        float3 _210 = _207 + float3(_80.z);
+        float3 _212 = float3(dot(_210, float3(0.2989999949932098388671875, 0.58700001239776611328125, 0.114000000059604644775390625)));
+        float _217 = _84.y;
+        float _219 = _84.x;
+        float3 _228 = mix(mix(_210, _212 + float3(0.117646999657154083251953125, 0.0588239990174770355224609375, -0.117646999657154083251953125), float3(_82.x)), _212 + float3(1.401999950408935546875 * _217, ((-0.3440000116825103759765625) * _219) - (0.7139999866485595703125 * _217), 1.77199995517730712890625 * _219), float3(_82.z));
+        _240 = float4(fast::clamp(_228 + ((float3(1.0) - (_228 * 2.0)) * _82.y), float3(0.0), float3(1.0)) * _89, _89);
+        break;
+    } while(false);
+    out.out_var_SV_Target = _240;
+    return out;
+}
+
