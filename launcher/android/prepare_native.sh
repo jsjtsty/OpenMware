@@ -29,8 +29,8 @@ cp -R "$sdl_src/android-project/app/src/main/java/org/libsdl/app" "$app/sdl-java
 mkdir -p "$app/main/jniLibs/arm64-v8a" "$app/main/assets/shaders" "$app/main/assets/licenses"
 cp "$build/libmain.so" "$app/main/jniLibs/arm64-v8a/libmain.so"
 cp "$sdl_lib" "$app/main/jniLibs/arm64-v8a/libSDL3.so"
-# FFmpeg (LGPL) stays dynamic: libavcodec-<major>.so etc. (not the unversioned link names)
-cp "$build"/ffmpeg-install/lib/lib*-[0-9]*.so "$app/main/jniLibs/arm64-v8a/"
+# FFmpeg (LGPL) stays dynamic: libavcodec.so etc.
+cp "$build"/ffmpeg-install/lib/lib*.so "$app/main/jniLibs/arm64-v8a/"
 cp "$build"/ffmpeg-install/licenses/* "$app/main/assets/licenses/"
 cp "$root"/shaders/prebuilt/spv/* "$app/main/assets/shaders/"
 echo "Android project ready: gradle -p launcher/android assembleDebug"

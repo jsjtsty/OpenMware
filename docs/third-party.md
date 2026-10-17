@@ -16,7 +16,7 @@ FFmpeg is configured without `--enable-gpl` and `--enable-nonfree` (decoders: wm
 * Windows: `avcodec-*.dll` etc. next to `OpenMware.exe` and `openmware-player.exe`
 * Linux: `lib/` next to the executable (rpath `$ORIGIN/lib`)
 * macOS / iOS: `Frameworks/` inside the app bundle (rpath `@executable_path/../Frameworks`)
-* Android: `lib/arm64-v8a/lib*-<major>.so` inside the APK
+* Android: `lib/arm64-v8a/libav*.so`, `libsw*.so` inside the APK
 
 The licence texts (`COPYING.LGPLv2.1`, `LICENSE.md`) are shipped in `licenses/` (`Contents/Resources/licenses` in the macOS bundle, `assets/licenses` in the APK). The exact source and configuration used are the pinned archive and flags in `cmake/FFmpeg.cmake`; anybody can rebuild the libraries from them.
 

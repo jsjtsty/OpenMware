@@ -74,8 +74,7 @@ if(ANDROID)
 		"--cc=${_ndk_bin}/${_ff_triple}${ANDROID_PLATFORM_LEVEL}-clang"
 		"--ar=${_ndk_bin}/llvm-ar" "--nm=${_ndk_bin}/llvm-nm" "--ranlib=${_ndk_bin}/llvm-ranlib"
 		"--strip=${_ndk_bin}/llvm-strip")
-	# The APK only packages files named lib*.so: soname libavcodec-<major>.so instead of libavcodec.so.<major>.
-	set(_ff_make_vars "'SLIBNAME_WITH_MAJOR=\$(SLIBPREF)\$(FULLNAME)-\$(LIBMAJOR)\$(SLIBSUF)' 'SLIB_INSTALL_NAME=\$(SLIBNAME_WITH_MAJOR)' 'SLIB_INSTALL_LINKS=\$(SLIBNAME)'")
+	# FFmpeg's own Android target already names the libraries libavcodec.so (soname and file, no version), which the APK packages.
 elseif(IOS)
 	execute_process(COMMAND xcrun --sdk iphoneos --show-sdk-path OUTPUT_VARIABLE _ios_sdk OUTPUT_STRIP_TRAILING_WHITESPACE)
 	execute_process(COMMAND xcrun --sdk iphoneos --find clang OUTPUT_VARIABLE _ios_cc OUTPUT_STRIP_TRAILING_WHITESPACE)
