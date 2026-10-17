@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Development tools and checks (npktool, nutdis, scriptrun, gpu_demo, tests); the mobile packages only need the game itself.
+if(ANDROID OR IOS)
+	set(_omw_tools_default OFF)
+else()
+	set(_omw_tools_default ON)
+endif()
+option(OMW_BUILD_TOOLS "Build the developer tools" ${_omw_tools_default})
+
 find_package(zstd CONFIG REQUIRED)
 
 # Squirrel 2.2.4 fork (32/64-bit bytecode ABI selectable at runtime via sq_open_ex).
@@ -23,8 +31,10 @@ target_include_directories(omw_archive PUBLIC src)
 target_link_libraries(omw_archive PUBLIC
 	$<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)
 
-add_executable(npktool tools/npktool.cpp)
-target_link_libraries(npktool PRIVATE omw_archive)
+if(OMW_BUILD_TOOLS)
+	add_executable(npktool tools/npktool.cpp)
+	target_link_libraries(npktool PRIVATE omw_archive)
+endif()
 
 # --- Rendering (SDL3 GPU) -----------------------------------------------------------------------
 find_package(SDL3 CONFIG REQUIRED)
@@ -81,11 +91,15 @@ endforeach()
 omw_add_shader(NAME psfx_blur.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_BLUR)
 omw_add_shader(NAME psfx_color.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_COLOR)
 omw_add_shader(NAME psfx_warp.frag STAGE fragment SOURCE ${PROJECT_SOURCE_DIR}/shaders/hlsl/fx.hlsl DEFINES FX_WARP)
-add_custom_target(omw_shaders DEPENDS ${_omw_all_shader_outputs})
+if(NOT OMW_PREBUILT_SHADERS)
+	add_custom_target(omw_shaders DEPENDS ${_omw_all_shader_outputs})
+endif()
 
-add_executable(gpu_demo apps/gpu_demo.cpp)
-target_link_libraries(gpu_demo PRIVATE omw_render)
-add_dependencies(gpu_demo omw_shaders)
+if(OMW_BUILD_TOOLS)
+	add_executable(gpu_demo apps/gpu_demo.cpp)
+	target_link_libraries(gpu_demo PRIVATE omw_render)
+	add_dependencies(gpu_demo omw_shaders)
+endif()
 
 # --- Script runtime -----------------------------------------------------------------------------
 add_library(omw_script STATIC src/script/host.cpp src/script/natives.cpp src/script/natives_action.cpp
@@ -94,24 +108,55 @@ target_include_directories(omw_script PUBLIC src)
 target_link_libraries(omw_script PUBLIC omw_archive omw_game omw_render omw_audio omw_video squirrel2::squirrel2)
 target_include_directories(omw_script PRIVATE third_party/squirrel2/squirrel) # vm_snapshot.cpp walks the VM's internals
 
-add_executable(scriptrun apps/scriptrun.cpp)
-target_link_libraries(scriptrun PRIVATE omw_script)
+if(OMW_BUILD_TOOLS)
+	add_executable(scriptrun apps/scriptrun.cpp)
+	target_link_libraries(scriptrun PRIVATE omw_script)
 
-# Developer tool: script disassembler (uses Squirrel internals).
-add_executable(nutdis tools/nutdis.cpp)
-target_include_directories(nutdis PRIVATE third_party/squirrel2/squirrel)
-target_link_libraries(nutdis PRIVATE squirrel2::squirrel2)
+	# Developer tool: script disassembler (uses Squirrel internals).
+	add_executable(nutdis tools/nutdis.cpp)
+	target_include_directories(nutdis PRIVATE third_party/squirrel2/squirrel)
+	target_link_libraries(nutdis PRIVATE squirrel2::squirrel2)
+endif()
 
 # --- The game ------------------------------------------------------------------------------------
-add_executable(omw apps/omw.cpp)
+# Android: SDL's Java activity loads libmain.so and calls SDL_main in it. Everywhere else it is the executable "omw"
+# (an app bundle on macOS and iOS, with the shaders inside).
+if(ANDROID)
+	add_library(omw SHARED apps/omw.cpp)
+	set_target_properties(omw PROPERTIES OUTPUT_NAME main)
+else()
+	add_executable(omw apps/omw.cpp)
+endif()
 target_link_libraries(omw PRIVATE omw_script omw_render omw_game)
 add_dependencies(omw omw_shaders)
 
+if(APPLE)
+	set_target_properties(omw PROPERTIES
+		MACOSX_BUNDLE TRUE
+		MACOSX_BUNDLE_GUI_IDENTIFIER "org.openmware.omw"
+		MACOSX_BUNDLE_BUNDLE_NAME "OpenMware"
+		MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+		MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+		MACOSX_BUNDLE_INFO_PLIST "${PROJECT_SOURCE_DIR}/cmake/Info.plist.in"
+		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.openmware.omw")
+	# The engine finds its shaders next to the bundle's resources (SDL_GetBasePath).
+	if(IOS)
+		set(_omw_shader_dest "$<TARGET_BUNDLE_CONTENT_DIR:omw>/shaders")
+	else()
+		set(_omw_shader_dest "$<TARGET_BUNDLE_CONTENT_DIR:omw>/Resources/shaders")
+	endif()
+	add_custom_command(TARGET omw POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_SHADER_OUT}" "${_omw_shader_dest}"
+		COMMENT "Copying shaders into the app bundle")
+endif()
+
 # Standalone SQAction1D tempo-curve checks; does not link the script runtime.
-add_executable(test_easing tests/test_easing.cpp src/script/easing.cpp)
-target_include_directories(test_easing PRIVATE src)
-if(MSVC)
-	target_compile_options(test_easing PRIVATE /fp:strict)
-else()
-	target_compile_options(test_easing PRIVATE -ffp-contract=off)
+if(OMW_BUILD_TOOLS)
+	add_executable(test_easing tests/test_easing.cpp src/script/easing.cpp)
+	target_include_directories(test_easing PRIVATE src)
+	if(MSVC)
+		target_compile_options(test_easing PRIVATE /fp:strict)
+	else()
+		target_compile_options(test_easing PRIVATE -ffp-contract=off)
+	endif()
 endif()

@@ -1,16 +1,50 @@
-# omw_add_shader(TARGET <t> NAME <out-name> STAGE vertex|fragment SOURCE <hlsl> [DEFINES A B ...])
-# Produces <bindir>/shaders/<NAME>.{spv,dxil[,msl]} via SDL_shadercross, after patching registers to SDL_gpu spaces.
-find_program(OMW_SHADERCROSS shadercross
-	HINTS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/sdl3-shadercross"
-	      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
-	REQUIRED)
+# omw_add_shader(NAME <out-name> STAGE vertex|fragment SOURCE <hlsl> [DEFINES A B ...])
+# Produces <bindir>/shaders/<NAME>.{spv,dxil,msl} via SDL_shadercross, after patching registers to SDL_gpu spaces.
+#
+# Which formats are built (OMW_SHADER_FORMATS, a list of spv / dxil / msl): the ones the platform's GPU backends take
+# (Windows: SPIR-V for Vulkan + DXIL for D3D12, Linux and Android: SPIR-V, Apple: MSL). "all" builds the three of them,
+# which is what the CI shader job does to hand the result to hosts that cannot run shadercross (macOS, Android, iOS:
+# its DXC dependency only exists for Windows and Linux x64). On those hosts pass OMW_PREBUILT_SHADERS=<dir> instead.
+set(OMW_PREBUILT_SHADERS "" CACHE PATH "Directory of ready-made shader binaries (skips shadercross)")
+set(OMW_SHADER_FORMATS "" CACHE STRING "Shader formats to build: spv;dxil;msl or 'all' (default: by platform)")
+
+if(NOT OMW_SHADER_FORMATS)
+	if(WIN32)
+		set(_omw_formats spv dxil)
+	elseif(APPLE)
+		set(_omw_formats msl)
+	else()
+		set(_omw_formats spv)
+	endif()
+elseif(OMW_SHADER_FORMATS STREQUAL "all")
+	set(_omw_formats spv dxil msl)
+else()
+	set(_omw_formats ${OMW_SHADER_FORMATS})
+endif()
 
 set(OMW_SHADER_OUT "${CMAKE_BINARY_DIR}/shaders")
-set(OMW_SHADER_FORMATS spv dxil)
-if(APPLE)
-	list(APPEND OMW_SHADER_FORMATS msl)
-endif()
 set(_omw_all_shader_outputs "")
+
+if(OMW_PREBUILT_SHADERS)
+	# Nothing to compile: omw_shaders copies the ready-made files to where the build expects them.
+	add_custom_target(omw_shaders
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_PREBUILT_SHADERS}" "${OMW_SHADER_OUT}"
+		COMMENT "Using prebuilt shaders from ${OMW_PREBUILT_SHADERS}")
+	function(omw_add_shader)
+	endfunction()
+	return()
+endif()
+
+find_program(OMW_SHADERCROSS shadercross
+	HINTS "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/sdl3-shadercross"
+	      "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/bin"
+	      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/sdl3-shadercross"
+	      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
+	DOC "SDL_shadercross command line tool")
+if(NOT OMW_SHADERCROSS)
+	message(FATAL_ERROR "shadercross not found. Install the vcpkg feature 'shader-tools' (Windows / Linux x64) or pass "
+		"-DOMW_PREBUILT_SHADERS=<dir> with shaders built on such a host.")
+endif()
 
 function(omw_add_shader)
 	cmake_parse_arguments(S "" "NAME;STAGE;SOURCE" "DEFINES" ${ARGN})
@@ -24,7 +58,7 @@ function(omw_add_shader)
 		COMMAND ${CMAKE_COMMAND} -DIN=${S_SOURCE} -DOUT=${_patched} -DSTAGE=${S_STAGE} -P ${PROJECT_SOURCE_DIR}/cmake/PatchHlsl.cmake
 		DEPENDS "${S_SOURCE}" "${PROJECT_SOURCE_DIR}/cmake/PatchHlsl.cmake" VERBATIM)
 	set(_outs "")
-	foreach(fmt IN LISTS OMW_SHADER_FORMATS)
+	foreach(fmt IN LISTS _omw_formats)
 		string(TOUPPER ${fmt} _D)
 		if(fmt STREQUAL spv)
 			set(_D SPIRV)

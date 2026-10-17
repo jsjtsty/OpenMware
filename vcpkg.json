@@ -5,10 +5,6 @@
   "dependencies": [
     "zstd",
     "sdl3",
-    {
-      "name": "sdl3-shadercross",
-      "host": false
-    },
     "libwebp",
     "stb",
     {
@@ -16,5 +12,17 @@
       "default-features": false,
       "features": ["avcodec", "avformat", "swresample", "swscale"]
     }
-  ]
+  ],
+  "default-features": ["shader-tools"],
+  "features": {
+    "shader-tools": {
+      "description": "SDL_shadercross, compiles the HLSL shaders to SPIR-V / DXIL / MSL. Its DXC dependency only exists for Windows and Linux x64, so macOS, Android and iOS builds turn this feature off and use shaders prebuilt on one of those hosts (OMW_PREBUILT_SHADERS).",
+      "dependencies": [
+        {
+          "name": "sdl3-shadercross",
+          "host": true
+        }
+      ]
+    }
+  }
 }

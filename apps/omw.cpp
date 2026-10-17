@@ -9,6 +9,7 @@
 #include "script/host.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h> // the entry point on Android and iOS (and wide-character arguments on Windows)
 
 #include <cstdio>
 #include <cstdlib>
@@ -20,11 +21,20 @@ using namespace omw;
 
 int main(int argc, char** argv) {
 	std::setvbuf(stdout, nullptr, _IONBF, 0); // keep diagnostics visible if the process crashes
-	if (argc < 2) {
-		std::fputs("usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--frames N] [--shot FILE]\n", stderr);
+	// Phones start the app without arguments: the game files and the keys file are looked up in the app's user-visible
+	// data folder (Android: the app's external files dir, iOS: Documents), see docs/mobile.md.
+	const std::string platform = SDL_GetPlatform();
+	const bool mobile = platform == "Android" || platform == "iOS";
+	const bool has_game_arg = argc >= 2 && argv[1][0] != '-';
+	if (!has_game_arg && !mobile) {
+		std::fputs("usage: omw GAME_DIR [--keys FILE] [--shaders DIR] [--data-dir DIR] [--frames N] [--shot FILE]\n", stderr);
 		return 2;
 	}
-	std::filesystem::path game_dir = argv[1], keys = "keys.local.txt", shaders = "shaders";
+	// Arguments are UTF-8 (SDL_main converts them on Windows); a plain path(const char*) would read them in the ANSI code page.
+	auto utf8_path = [](const char* s) { return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(s))); };
+	std::filesystem::path game_dir, keys = "keys.local.txt", shaders, data_dir;
+	if (has_game_arg) game_dir = utf8_path(argv[1]);
+	bool keys_given = false;
 	int frames = -1;
 	bool trace = false;
 	std::string shot;
@@ -41,10 +51,11 @@ int main(int argc, char** argv) {
 	std::vector<EvalEvery> eval_every; // --eval-every FIRST:PERIOD:SNIPPET
 	std::vector<std::pair<int, int>> holds; // --hold FRAME:KEYCODE
 	std::vector<std::pair<int, int>> taps; // --press FRAME:KEYCODE (scripted key taps for tests)
-	for (int i = 2; i < argc; i++) {
+	for (int i = has_game_arg ? 2 : 1; i < argc; i++) {
 		const std::string a = argv[i];
-		if (a == "--keys" && i + 1 < argc) keys = argv[++i];
-		else if (a == "--shaders" && i + 1 < argc) shaders = argv[++i];
+		if (a == "--keys" && i + 1 < argc) { keys = utf8_path(argv[++i]); keys_given = true; }
+		else if (a == "--shaders" && i + 1 < argc) shaders = utf8_path(argv[++i]);
+		else if (a == "--data-dir" && i + 1 < argc) data_dir = utf8_path(argv[++i]);
 		else if (a == "--frames" && i + 1 < argc) frames = std::atoi(argv[++i]);
 		else if (a == "--shot" && i + 1 < argc) shot = argv[++i];
 		else if (a == "--trace") trace = true;
@@ -87,6 +98,40 @@ int main(int argc, char** argv) {
 			int f = 0, k = 0;
 			if (std::sscanf(argv[++i], "%d:%d", &f, &k) == 2) taps.emplace_back(f, k);
 		}
+	}
+
+	// Where things live. Desktop: as given (the working directory holds "save/" and "temp/"). Mobile: the app's data folder.
+	if (mobile) {
+		const char* base = nullptr;
+#ifdef SDL_PLATFORM_ANDROID
+		base = SDL_GetAndroidExternalStoragePath();
+#else
+		base = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+#endif
+		if (base) {
+			if (data_dir.empty()) data_dir = utf8_path(base);
+			if (!has_game_arg) game_dir = data_dir / "game";
+			if (!keys_given) keys = data_dir / "keys.txt";
+		}
+	}
+	if (shaders.empty()) { // not given: "shaders" in the working directory, else next to the executable / inside the bundle
+		shaders = "shaders";
+		const char* base = SDL_GetBasePath();
+		if (base && !std::filesystem::exists(shaders)) shaders = utf8_path(base) / "shaders";
+#ifdef SDL_PLATFORM_ANDROID
+		shaders = "shaders"; // an asset inside the APK, read through SDL_LoadFile
+#endif
+	}
+	if (!data_dir.empty()) { // scripts use relative paths for saves; they land inside the data folder
+		std::error_code ec;
+#ifndef SDL_PLATFORM_ANDROID // on Android the shaders are an asset inside the APK, not a path
+		shaders = std::filesystem::absolute(shaders, ec);
+#endif
+		if (!game_dir.empty()) game_dir = std::filesystem::absolute(game_dir, ec);
+		keys = std::filesystem::absolute(keys, ec);
+		std::filesystem::create_directories(data_dir, ec);
+		std::filesystem::current_path(data_dir, ec);
+		if (ec) std::fprintf(stderr, "cannot use data dir %s: %s\n", data_dir.string().c_str(), ec.message().c_str());
 	}
 
 	std::string err;
@@ -136,7 +181,7 @@ int main(int argc, char** argv) {
 		// decides how many logic steps are due per presented frame (none on a 144 Hz display half the time, several after a stall).
 		const bool realtime = frames < 0 && shot.empty() && shots_at.empty();
 		const bool mem_stats = std::getenv("OMW_MEMSTATS") != nullptr; // prints cache/stage occupancy every 3000 frames
-		const bool render_all =std::getenv("OMW_RENDER_ALL") != nullptr; // headless runs normally skip drawing; effects that read the screen need it
+		const bool render_all = std::getenv("OMW_RENDER_ALL") != nullptr; // headless runs normally skip drawing; effects that read the screen need it
 		const Uint64 step_ns = 1000000000ull / 60;
 		Uint64 last_ns = SDL_GetTicksNS(), acc_ns = step_ns;
 		int catch_up = 0;

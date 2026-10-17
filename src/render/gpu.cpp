@@ -41,18 +41,22 @@ void GpuContext::shutdown() {
 }
 
 SDL_GPUShader* GpuContext::load_shader(const std::string& name, SDL_GPUShaderStage stage, Uint32 samplers, Uint32 uniform_buffers) {
-	std::ifstream f(shader_dir / (name + format_ext), std::ios::binary);
-	if (!f) return nullptr;
-	std::vector<char> code((std::istreambuf_iterator<char>(f)), {});
+	// SDL_LoadFile also reads Android assets (the shaders ship inside the APK) and iOS/macOS bundle paths.
+	size_t code_size = 0;
+	const auto u8 = (shader_dir / (name + format_ext)).u8string(); // SDL takes UTF-8 paths
+	void* code = SDL_LoadFile(std::string(u8.begin(), u8.end()).c_str(), &code_size);
+	if (!code) return nullptr;
 	SDL_GPUShaderCreateInfo info{};
-	info.code = reinterpret_cast<const Uint8*>(code.data());
-	info.code_size = code.size();
+	info.code = static_cast<const Uint8*>(code);
+	info.code_size = code_size;
 	info.entrypoint = format == SDL_GPU_SHADERFORMAT_MSL ? "main0" : "main";
 	info.format = format;
 	info.stage = stage;
 	info.num_samplers = samplers;
 	info.num_uniform_buffers = uniform_buffers;
-	return SDL_CreateGPUShader(device, &info);
+	SDL_GPUShader* shader = SDL_CreateGPUShader(device, &info);
+	SDL_free(code);
+	return shader;
 }
 
 SDL_GPUTexture* GpuContext::create_texture_rgba8(int w, int h, const void* pixels, bool render_target) {
