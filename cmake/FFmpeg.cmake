@@ -192,8 +192,12 @@ else()
 	set(_ff_suf_ ".a")
 endif()
 set(_ff_link_files "")
+set(_ff_link_dir "${_omw_ff_prefix}/lib")
+if(MSVC AND OMW_FFMPEG_SHARED)
+	set(_ff_link_dir "${_omw_ff_prefix}/bin") # FFmpeg installs the import libraries next to the DLLs
+endif()
 foreach(_l IN LISTS _omw_ff_libs)
-	list(APPEND _ff_link_files "${_omw_ff_prefix}/lib/${_ff_pfx_}${_l}${_ff_suf_}")
+	list(APPEND _ff_link_files "${_ff_link_dir}/${_ff_pfx_}${_l}${_ff_suf_}")
 endforeach()
 set(_ff_byproducts ${_ff_link_files})
 # Where the runtime libraries land (to be shipped / found at run time).
