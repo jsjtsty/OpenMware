@@ -5,7 +5,8 @@ OpenMware is split into the engine and a native launcher per platform. The engin
 ```
 include/mware/mware.h     libmware C API: mw_run (play), mw_probe (check archives + keys), mw_version
 src/api/session.*         one run of the game: archives, window, renderer, audio, script loop
-apps/openmware.cpp        command-line player (Windows OpenMware.exe, macOS openmware-player, Android libmain.so)
+apps/openmware.cpp        command-line player (openmware-player; Android libmain.so); --probe checks archives and keys without a window
+launcher/qt/              Qt 6 Widgets app for Windows and Linux (CMake option OMW_BUILD_LAUNCHER)
 launcher/apple/           SwiftUI app for macOS and iOS (XcodeGen project.yml, Sources/Shared)
 launcher/android/         Jetpack Compose app + SDL game activity (Gradle)
 ```
@@ -15,7 +16,7 @@ launcher/android/         Jetpack Compose app + SDL game activity (Gradle)
 | macOS | SwiftUI | child process `openmware-player` inside the app bundle (crash isolation; the UI toolkit and SDL do not fight over the main thread) |
 | iOS | SwiftUI | `mw_run` in the same process (iOS has no child processes); it returns when the game window closes |
 | Android | Compose | `GameActivity` (an `SDLActivity`) gets the game folder in its intent; `libmain.so` is `apps/openmware.cpp` |
-| Windows, Linux | none yet | `OpenMware GAME_DIR --keys FILE` |
+| Windows, Linux | Qt 6 Widgets | child process `openmware-player` next to the launcher (same reasons as macOS); the command-line player still works on its own |
 
 ## What the launchers do
 
@@ -23,11 +24,13 @@ launcher/android/         Jetpack Compose app + SDL game activity (Gradle)
 * Add a game: pick the game folder, give it a name, import or paste the NPK keys. Apple can **link** the folder (a security-scoped bookmark, nothing duplicated) or **copy** it into the app; Android always copies the `.npk` files into app storage (the system folder picker returns `content://` URIs the engine cannot read directly).
 * Per game: rename, replace keys, check files and keys (Apple: `mw_probe`), export save data as a zip, delete save data, remove the game.
 * Every game has its own `data/` folder; the engine's working directory is that folder while playing, so scripts' `save/` and `temp/` never mix between games.
-* English and Simplified Chinese.
+* English and Simplified Chinese (the Qt launcher follows the system language). Windows and Linux link the game folder in place or copy it into the library (`%APPDATA%/OpenMware`, `~/.local/share/OpenMware`), and check files and keys with `openmware-player --probe`.
 
 ## Building
 
 ```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMW_BUILD_LAUNCHER=ON && cmake --build build   # Windows/Linux: build/OpenMware(.exe) + openmware-player
+scripts/linux/package.sh build   # dist/OpenMware-linux-x64.tar.gz
 scripts/apple/build.sh macos     # dist/OpenMware-macos-arm64.zip   (needs Xcode, xcodegen, cmake, ninja)
 scripts/apple/build.sh ios       # dist/OpenMware-ios-arm64-unsigned.ipa
 scripts/android/build.sh debug   # dist/OpenMware-android-arm64-debug.apk   (needs the NDK, Android SDK, JDK 17, gradle)

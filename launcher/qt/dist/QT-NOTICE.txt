@@ -1,0 +1,11 @@
+Qt notice
+
+The OpenMware launcher (OpenMware.exe / openmware) uses the Qt 6 toolkit (QtCore, QtGui, QtWidgets), (C) The Qt Company Ltd. and
+other contributors, licensed under the GNU Lesser General Public License version 3 (LGPLv3, with the GPLv3 it refers to).
+
+Qt is used unmodified and only as shared libraries (Windows: Qt6*.dll and the plugins next to the program; Linux: your
+distribution's libQt6*.so). You can replace them with another build of the same Qt 6 version.
+
+Licence texts:   https://www.gnu.org/licenses/lgpl-3.0.txt   https://www.gnu.org/licenses/gpl-3.0.txt
+Qt source code:  https://download.qt.io/official_releases/qt/   (the version is in the Qt6Core library file's properties)
+Qt licensing:    https://www.qt.io/licensing/

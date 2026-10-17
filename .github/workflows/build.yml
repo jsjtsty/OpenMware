@@ -3,7 +3,8 @@ name: Build
 # Builds the engine and the launchers for every platform (no game data is involved or shipped). All third-party code (SDL3,
 # zstd, libwebp, stb, FFmpeg) is fetched as source and compiled by CMake, see cmake/Dependencies.cmake and cmake/FFmpeg.cmake;
 # the shaders are the checked-in ones under shaders/prebuilt. The scripts do the real work, so every step can be run locally:
-#   windows  OpenMware.exe (command line player; Vulkan + Direct3D 12)                 build: cmake
+#   windows  OpenMware.exe (Qt launcher) + openmware-player.exe; Vulkan + Direct3D 12   build: cmake -DOMW_BUILD_LAUNCHER=ON
+#   linux    openmware (Qt launcher) + openmware-player, Vulkan, tar.gz                  build: cmake + scripts/linux/package.sh
 #   macos    OpenMware.app: SwiftUI launcher + openmware-player, Metal, ad-hoc signed   build: scripts/apple/build.sh macos
 #   ios      unsigned OpenMware.ipa: SwiftUI launcher with libmware in-process, Metal   build: scripts/apple/build.sh ios
 #   android  OpenMware APK: Compose launcher + SDL activity, Vulkan, arm64-v8a          build: scripts/android/build.sh
@@ -49,8 +50,15 @@ jobs:
           Rename-Item "$root/usr/bin/link.exe" link.exe.bak -ErrorAction SilentlyContinue
           "OMW_MSYS2_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      # The launcher (launcher/qt) uses Qt as shared libraries (LGPL); windeployqt copies them next to it.
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMW_BUILD_LAUNCHER=ON
 
       - name: Build
         run: cmake --build build
@@ -63,9 +71,12 @@ jobs:
         run: |
           $out = 'dist/OpenMware-windows-x64'
           New-Item -ItemType Directory -Force $out | Out-Null
-          Copy-Item build/OpenMware.exe, build/npktool.exe $out
+          Copy-Item build/OpenMware.exe, build/openmware-player.exe, build/npktool.exe $out
           Copy-Item build/*.dll $out   # FFmpeg (LGPL) stays a set of DLLs next to the program
+          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw --no-compiler-runtime "$out/OpenMware.exe"
           Copy-Item -Recurse build/ffmpeg-install/licenses "$out/licenses"
+          Copy-Item launcher/qt/dist/QT-NOTICE.txt "$out/licenses/"
+          Copy-Item docs/third-party.md "$out/licenses/THIRD-PARTY.md"
           # Windows GPUs take SPIR-V (Vulkan) or DXIL (Direct3D 12); both sets were copied next to the executable.
           Copy-Item -Recurse build/shaders "$out/shaders"
           Copy-Item docs/running.md "$out/README.md"
@@ -75,6 +86,38 @@ jobs:
         with:
           name: OpenMware-windows-x64
           path: dist/OpenMware-windows-x64.zip
+
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # SDL3's development packages, FFmpeg's build tools and Qt 6 (the launcher links the distribution's Qt dynamically).
+      - name: Build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build nasm pkg-config qt6-base-dev libgl1-mesa-dev libvulkan-dev \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
+            libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libegl1-mesa-dev libdbus-1-dev \
+            libudev-dev libwayland-dev libdecor-0-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMW_BUILD_LAUNCHER=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: build/test_easing
+
+      - name: Package
+        run: bash scripts/linux/package.sh build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenMware-linux-x64
+          path: dist/OpenMware-linux-x64.tar.gz
 
   macos:
     name: macOS arm64
@@ -161,7 +204,7 @@ jobs:
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, macos, android, ios]
+    needs: [windows, linux, macos, android, ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write

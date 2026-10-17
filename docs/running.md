@@ -1,6 +1,6 @@
 # Running OpenMware
 
-OpenMware is an engine; it does not contain the game. Point it at your own copy of the game's folder (the one holding the `.npk` archives):
+OpenMware is an engine; it does not contain the game. On Windows and Linux start the launcher (`OpenMware.exe` / `openmware`): add the game folder and the keys once, then press Play. The command-line player underneath can be used directly; point it at your own copy of the game's folder (the one holding the `.npk` archives):
 
 ```powershell
 OpenMware.exe "D:\Games\<game folder>" --keys keys.txt

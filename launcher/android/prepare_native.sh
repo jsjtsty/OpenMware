@@ -15,7 +15,7 @@ cmake -S "$root" -B "$build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
-cmake --build "$build" --target openmware
+cmake --build "$build" --target openmware_player
 
 sdl_src="$build/_deps/sdl3-src"
 sdl_lib="$(find "$build/_deps/sdl3-build" -maxdepth 1 -name 'libSDL3.so' | head -n1)"

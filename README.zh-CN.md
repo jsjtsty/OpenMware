@@ -48,14 +48,14 @@ OpenMware.exe "D:\Games\<游戏目录>" --keys keys.txt
 
 | 路径 | 内容 |
 | --- | --- |
-| `src/`、`apps/` | 引擎库与 `OpenMware` 可执行文件 |
+| `src/`、`apps/` | 引擎库与 `openmware-player` 可执行文件 |
 | `third_party/squirrel2` | Squirrel 2.2.4 分支 |
 | `shaders/` | HLSL 源码与预编译的 `prebuilt/{spv,dxil,msl}` |
 | `include/mware/` | 供启动器调用的 libmware C 接口 |
-| `launcher/` | 各平台原生启动器：SwiftUI（macOS、iOS）与 Jetpack Compose（Android），见 [docs/launchers.md](docs/launchers.md) |
+| `launcher/` | 各平台原生启动器：Qt（Windows、Linux）、SwiftUI（macOS、iOS）与 Jetpack Compose（Android），见 [docs/launchers.md](docs/launchers.md) |
 | `tools/`、`scripts/` | 开发工具（档案解包、脚本反汇编、逆向辅助脚本） |
 | `docs/` | 引擎、格式与脚本笔记 |
-| `.github/workflows` | Windows、macOS、Android、iOS 的 CI |
+| `.github/workflows` | Windows、Linux、macOS、Android、iOS 的 CI |
 
 ## 声明
 

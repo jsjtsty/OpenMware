@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OpenMware
+Comment=Game library and launcher for the OpenMware engine
+Exec=./openmware
+Icon=openmware
+Terminal=false
+Categories=Game;

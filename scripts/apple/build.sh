@@ -20,7 +20,7 @@ case "$platform" in
   macos)
     cmake -S "$root" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
-    cmake --build "$build" --target mware openmware
+    cmake --build "$build" --target mware openmware_player
     framework="$build/mware.framework"
     ;;
   ios)

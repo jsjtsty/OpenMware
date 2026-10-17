@@ -89,19 +89,15 @@ add_dependencies(omw_session omw_shaders)
 # FFmpeg (LGPL) is a set of shared libraries that ship next to whatever links them (see omw_ffmpeg_runtime below).
 # Android: SDL's Java activity loads libmain.so and calls SDL_main in it. iOS has no command-line program, only libmware.
 if(ANDROID)
-	add_library(openmware SHARED apps/openmware.cpp)
-	set_target_properties(openmware PROPERTIES OUTPUT_NAME main)
+	add_library(openmware_player SHARED apps/openmware.cpp)
+	set_target_properties(openmware_player PROPERTIES OUTPUT_NAME main)
 elseif(NOT IOS)
-	add_executable(openmware apps/openmware.cpp)
-	# OpenMware.exe on Windows; openmware-player inside the macOS launcher app (the launcher is OpenMware.app/.../openmware)
-	if(APPLE)
-		set_target_properties(openmware PROPERTIES OUTPUT_NAME openmware-player)
-	else()
-		set_target_properties(openmware PROPERTIES OUTPUT_NAME OpenMware)
-	endif()
+	add_executable(openmware_player apps/openmware.cpp)
+	# The command-line player is openmware-player everywhere; the launcher apps (launcher/) are the programs named OpenMware.
+	set_target_properties(openmware_player PROPERTIES OUTPUT_NAME openmware-player)
 endif()
-if(TARGET openmware)
-	target_link_libraries(openmware PRIVATE omw_session)
+if(TARGET openmware_player)
+	target_link_libraries(openmware_player PRIVATE omw_session)
 endif()
 
 # libmware: the engine as a library for the SwiftUI launcher (iOS in-process player, macOS probe), a framework on Apple.
@@ -125,6 +121,12 @@ if(OMW_BUILD_LIBRARY)
 	endif()
 endif()
 
+# The Qt launcher for Windows and Linux (Qt 6 Widgets, LGPL as shared libraries); starts openmware-player next to it.
+option(OMW_BUILD_LAUNCHER "Build the Qt launcher (Windows, Linux)" OFF)
+if(OMW_BUILD_LAUNCHER)
+	add_subdirectory(launcher/qt)
+endif()
+
 function(omw_ffmpeg_runtime target)
 	if(NOT (TARGET ffmpeg_ext AND OMW_FFMPEG_SHARED))
 		return()
@@ -140,10 +142,10 @@ function(omw_ffmpeg_runtime target)
 			COMMAND ${CMAKE_COMMAND} -E copy_directory "${OMW_FFMPEG_RUNTIME_DIR}" $<TARGET_FILE_DIR:${target}>/lib)
 	endif()
 endfunction()
-if(TARGET openmware)
-	omw_ffmpeg_runtime(openmware)
+if(TARGET openmware_player)
+	omw_ffmpeg_runtime(openmware_player)
 	if(OMW_FFMPEG_DLLS) # only with OMW_FFMPEG_ROOT pointing at a shared FFmpeg
-		add_custom_command(TARGET openmware POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:openmware>)
+		add_custom_command(TARGET openmware_player POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OMW_FFMPEG_DLLS} $<TARGET_FILE_DIR:openmware_player>)
 	endif()
 endif()
 

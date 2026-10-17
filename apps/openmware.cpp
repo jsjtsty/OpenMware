@@ -6,6 +6,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h> // the entry point on Android and iOS (and wide-character arguments on Windows)
 
+#include "game/game_files.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -27,6 +29,26 @@ int main(int argc, char** argv) {
 	}
 	// Arguments are UTF-8 (SDL_main converts them on Windows); a plain path(const char*) would read them in the ANSI code page.
 	auto utf8_path = [](const char* s) { return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(s))); };
+	// --probe: open the archives with the keys and check the boot script, without a window (used by the Qt launcher).
+	// Prints "ok ARCHIVES" or "error MESSAGE" and exits with 0 or 1.
+	for (int i = 2; i < argc; i++) {
+		if (std::string(argv[i]) != "--probe") continue;
+		std::filesystem::path keys = "keys.local.txt";
+		for (int j = 2; j + 1 < argc; j++) if (std::string(argv[j]) == "--keys") keys = utf8_path(argv[j + 1]);
+		GameFiles files;
+		std::string perr;
+		std::vector<uint8_t> boot;
+		if (!files.open(utf8_path(argv[1]), keys, &perr)) {
+			std::printf("error %s\n", perr.empty() ? "no game archives found" : perr.c_str());
+			return 1;
+		}
+		if (!files.archive("script") || !files.read("media/script/main.nut", boot)) {
+			std::puts("error the boot script (script.npk) is missing or unreadable");
+			return 1;
+		}
+		std::printf("ok %d\n", static_cast<int>(files.archive_count()));
+		return 0;
+	}
 	RunOptions opt;
 	opt.keys = "keys.local.txt";
 	if (has_game_arg) opt.game_dir = utf8_path(argv[1]);

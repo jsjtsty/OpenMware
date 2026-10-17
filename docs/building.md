@@ -20,7 +20,8 @@ cmake --build build
 ## Per platform
 
 * **Windows (MSVC)**: FFmpeg is configured by its own `configure` script, which needs a POSIX shell: install MSYS2 (`pacman -S make diffutils nasm`), rename `usr\bin\link.exe` away so MSVC's linker wins, and run CMake from a VS developer prompt. `OMW_MSYS2_ROOT` overrides `C:\msys64`. Shortcut for experiments: `-DOMW_FFMPEG_ROOT=<prefix>` uses an existing FFmpeg instead (DLLs next to it are copied).
-* **Linux**: needs the usual SDL3 development packages (X11/Wayland, ALSA/Pulse, ...), `make`, and `nasm` for the fast paths (optional).
+* **Linux**: needs the usual SDL3 development packages (X11/Wayland, ALSA/Pulse, ...), `make`, and `nasm` for the fast paths (optional); for the launcher also `qt6-base-dev`. `scripts/linux/package.sh build` makes `dist/OpenMware-linux-x64.tar.gz`.
+* **Qt launcher (Windows, Linux)**: add `-DOMW_BUILD_LAUNCHER=ON` (needs Qt 6.4+ Widgets, found through `CMAKE_PREFIX_PATH`/`Qt6_DIR`); on Windows run `windeployqt OpenMware.exe` to copy the Qt DLLs next to it. Qt stays dynamic (LGPL), see [third-party.md](third-party.md).
 * **macOS / iOS / Android**: use the scripts, they build the engine and the native launcher app around it: `scripts/apple/build.sh macos|ios` and `scripts/android/build.sh debug|release`. See [launchers.md](launchers.md).
 
 The CI workflow `.github/workflows/build.yml` runs exactly these commands.

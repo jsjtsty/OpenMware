@@ -20,6 +20,6 @@ launcher/android/app/src/main/assets/
 launcher/android/local.properties
 launcher/apple/OpenMware.xcodeproj/
 launcher/apple/Staging/
-dist/
+/dist/
 *.xcuserstate
 .DS_Store
