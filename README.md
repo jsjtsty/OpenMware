@@ -10,13 +10,12 @@ The current target is the Steam Chinese release of *君与彼女与彼女之恋*
 
 ## Status
 
-Work in progress. The engine boots the game, plays the title, the prologue and the second-playthrough "dark" route (including its separate UI), with text, sprites, transitions, effects, sound and WMV cutscenes.
+Work in progress. The engine boots the game and plays the title, the prologue, the story after the first choice and the second-playthrough "dark" route (including its separate UI), with text, sprites, transitions, effects, sound, WMV cutscenes, save/load (a snapshot of the script VM), quick save, skip and auto mode. Native launchers (library of games, play/stop) exist for every platform.
 
 Known gaps:
 
-* The phone page (the choice screen after the prologue) is not implemented, which blocks the main story.
-* Audio has only been checked headless; it has never been listened to.
-* Only Windows (Direct3D 12) has been run on real hardware. The Vulkan/Metal shaders, Linux, macOS, Android and iOS builds compile (or are set up in CI) but are untested at runtime.
+* Large parts of the story have not been played through; expect missing natives and glitches.
+* Only Windows (Direct3D 12) is regularly run on real hardware. The Vulkan/Metal shaders and the Linux, macOS, Android and iOS builds compile in CI but are only lightly tested at runtime.
 
 ## Features
 
@@ -59,4 +58,6 @@ See [docs/running.md](docs/running.md) and, for phones, [docs/mobile.md](docs/mo
 
 ## Legal
 
-OpenMware is an independent project, not affiliated with or endorsed by the original developers or publishers. Do not use it with data you do not own. No license has been chosen for this repository yet; until one is added, all rights are reserved.
+OpenMware is an independent project, not affiliated with or endorsed by the original developers or publishers. Do not use it with data you do not own.
+
+The source code is licensed under the **GNU General Public License v3.0 or later**, see [LICENSE](LICENSE). Third-party components keep their own licences (SDL3: zlib, Squirrel: MIT, FFmpeg and Qt: LGPL as shared libraries, ...), see [docs/third-party.md](docs/third-party.md). The licence covers only this repository: the game's data, scripts, art and sound belong to their rights holders and are not included.
