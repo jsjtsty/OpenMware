@@ -16,6 +16,8 @@ struct GpuContext {
 	SDL_GPUShaderFormat format = SDL_GPU_SHADERFORMAT_INVALID; // the format we load shaders in
 	const char* format_ext = ""; // file extension of that format (".spv", ".dxil", ".msl")
 	std::filesystem::path shader_dir;
+	void* metallib = nullptr; // Metal: shaders.metallib, read once and shared by all shaders
+	size_t metallib_size = 0;
 
 	bool init(const char* title, int width, int height, const std::filesystem::path& shader_dir, std::string* error);
 	void shutdown();

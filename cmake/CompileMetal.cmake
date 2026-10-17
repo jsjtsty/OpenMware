@@ -1,24 +1,41 @@
 # cmake -DSDK=macosx|iphoneos -DMIN=<-m...-version-min flag> -DIN=<dir of .msl> -DOUT=<dir> -DTMP=<dir> -P CompileMetal.cmake
-# Compiles every <name>.msl into <OUT>/<name>.metallib (Xcode's metal + metallib). Files that are up to date are skipped.
+# Compiles every <name>.msl into one <OUT>/shaders.metallib (Xcode's metal + metallib). The entry point of each shader is renamed
+# to omw_<name with '.' as '_'> so that they can live in the same library (GpuContext::load_shader looks them up by that name).
+# Nothing is done when the library is newer than all sources.
 file(MAKE_DIRECTORY "${OUT}" "${TMP}")
 file(GLOB _msl "${IN}/*.msl")
+set(_lib "${OUT}/shaders.metallib")
+set(_stale FALSE)
+if(NOT EXISTS "${_lib}")
+	set(_stale TRUE)
+endif()
 foreach(_f IN LISTS _msl)
-	get_filename_component(_n "${_f}" NAME_WE)
+	if("${_f}" IS_NEWER_THAN "${_lib}")
+		set(_stale TRUE)
+	endif()
+endforeach()
+if(NOT _stale)
+	return()
+endif()
+
+set(_airs "")
+foreach(_f IN LISTS _msl)
 	get_filename_component(_full "${_f}" NAME)
 	string(REGEX REPLACE "\\.msl$" "" _stem "${_full}")
+	string(REPLACE "." "_" _id "${_stem}")
+	file(READ "${_f}" _src)
+	string(REPLACE " main0(" " omw_${_id}(" _src "${_src}")
+	set(_renamed "${TMP}/${_stem}.metal")
 	set(_air "${TMP}/${_stem}.air")
-	set(_lib "${OUT}/${_stem}.metallib")
-	if(EXISTS "${_lib}" AND NOT "${_f}" IS_NEWER_THAN "${_lib}")
-		continue()
-	endif()
-	# -x metal: the .msl extension is not one the compiler driver knows
-	execute_process(COMMAND xcrun -sdk ${SDK} metal -x metal -c "${_f}" -o "${_air}" ${MIN}
+	file(WRITE "${_renamed}" "${_src}")
+	execute_process(COMMAND xcrun -sdk ${SDK} metal -c "${_renamed}" -o "${_air}" ${MIN}
 		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 	if(_rc OR NOT EXISTS "${_air}")
 		message(FATAL_ERROR "metal failed (${_rc}) for ${_f}:\n${_out}\n${_err}")
 	endif()
-	execute_process(COMMAND xcrun -sdk ${SDK} metallib "${_air}" -o "${_lib}" RESULT_VARIABLE _rc ERROR_VARIABLE _err)
-	if(_rc)
-		message(FATAL_ERROR "metallib failed for ${_f}:\n${_err}")
-	endif()
+	list(APPEND _airs "${_air}")
 endforeach()
+execute_process(COMMAND xcrun -sdk ${SDK} metallib ${_airs} -o "${_lib}" RESULT_VARIABLE _rc ERROR_VARIABLE _err)
+if(_rc)
+	message(FATAL_ERROR "metallib failed:\n${_err}")
+endif()

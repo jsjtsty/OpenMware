@@ -36,6 +36,9 @@ bool GpuContext::init(const char* title, int width, int height, const std::files
 }
 
 void GpuContext::shutdown() {
+	SDL_free(metallib);
+	metallib = nullptr;
+	metallib_size = 0;
 	if (device && window) SDL_ReleaseWindowFromGPUDevice(device, window);
 	if (window) SDL_DestroyWindow(window);
 	if (device) SDL_DestroyGPUDevice(device);
@@ -47,19 +50,36 @@ void GpuContext::shutdown() {
 SDL_GPUShader* GpuContext::load_shader(const std::string& name, SDL_GPUShaderStage stage, Uint32 samplers, Uint32 uniform_buffers) {
 	// SDL_LoadFile also reads Android assets (the shaders ship inside the APK) and iOS/macOS bundle paths.
 	size_t code_size = 0;
-	const auto u8 = (shader_dir / (name + format_ext)).u8string(); // SDL takes UTF-8 paths
-	void* code = SDL_LoadFile(std::string(u8.begin(), u8.end()).c_str(), &code_size);
-	if (!code) return nullptr;
+	void* code = nullptr;
+	std::string entry = "main";
+	if (format == SDL_GPU_SHADERFORMAT_METALLIB) {
+		// All shaders live in one library; each entry point is called omw_<name with '.' as '_'> (cmake/CompileMetal.cmake).
+		if (!metallib) {
+			const auto lib = (shader_dir / "shaders.metallib").u8string();
+			metallib = SDL_LoadFile(std::string(lib.begin(), lib.end()).c_str(), &metallib_size);
+			if (!metallib) return nullptr;
+		}
+		code = metallib;
+		code_size = metallib_size;
+		entry = "omw_" + name;
+		for (char& c : entry)
+			if (c == '.') c = '_';
+	} else {
+		const auto u8 = (shader_dir / (name + format_ext)).u8string(); // SDL takes UTF-8 paths
+		code = SDL_LoadFile(std::string(u8.begin(), u8.end()).c_str(), &code_size);
+		if (!code) return nullptr;
+		if (format == SDL_GPU_SHADERFORMAT_MSL) entry = "main0";
+	}
 	SDL_GPUShaderCreateInfo info{};
 	info.code = static_cast<const Uint8*>(code);
 	info.code_size = code_size;
-	info.entrypoint = (format == SDL_GPU_SHADERFORMAT_MSL || format == SDL_GPU_SHADERFORMAT_METALLIB) ? "main0" : "main";
+	info.entrypoint = entry.c_str();
 	info.format = format;
 	info.stage = stage;
 	info.num_samplers = samplers;
 	info.num_uniform_buffers = uniform_buffers;
 	SDL_GPUShader* shader = SDL_CreateGPUShader(device, &info);
-	SDL_free(code);
+	if (code != metallib) SDL_free(code);
 	return shader;
 }
 
