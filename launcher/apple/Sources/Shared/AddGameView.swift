@@ -8,7 +8,8 @@ struct AddGameView: View {
 
     private enum Importer { case folder, keys }
 
-    @State private var importer: Importer?
+    @State private var showImporter = false
+    @State private var importer: Importer = .folder // what the open panel is for; stays set while the result is handled
     @State private var scan: FolderScan?
     @State private var name = ""
     @State private var keysText = ""
@@ -26,7 +27,7 @@ struct AddGameView: View {
             Form {
                 Section(L("add_step_folder")) {
                     Text(L("add_folder_hint")).font(.callout).foregroundStyle(.secondary)
-                    Button { importer = .folder } label: {
+                    Button { importer = .folder; showImporter = true } label: {
                         Label(L(scan == nil ? "add_choose_folder" : "add_change_folder"), systemImage: "folder")
                     }
                     if let scan {
@@ -49,7 +50,7 @@ struct AddGameView: View {
                 }
 
                 Section(L("add_step_keys")) {
-                    Button { importer = .keys } label: { Label(L("add_keys_import"), systemImage: "key") }
+                    Button { importer = .keys; showImporter = true } label: { Label(L("add_keys_import"), systemImage: "key") }
                     Text(L("add_keys_paste")).font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $keysText)
                         .font(.system(.caption, design: .monospaced))
@@ -98,7 +99,7 @@ struct AddGameView: View {
                 }
             }
             .fileImporter(
-                isPresented: Binding(get: { importer != nil }, set: { if !$0 { importer = nil } }),
+                isPresented: $showImporter,
                 allowedContentTypes: importer == .folder ? [UTType.folder] : [UTType.plainText, UTType.data],
                 allowsMultipleSelection: false
             ) { result in
@@ -111,8 +112,6 @@ struct AddGameView: View {
                     error = nil
                 case .keys:
                     keysText = store.readText(url)
-                case nil:
-                    break
                 }
             }
             .interactiveDismissDisabled(working != nil)
