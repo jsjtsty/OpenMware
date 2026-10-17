@@ -217,7 +217,42 @@ void Stage::build_draw_list(DrawList& out) const {
 				e.pre.push_back(std::move(bx));
 				e.pre.push_back(std::move(by));
 			}
-			if (s->fx.any_color()) {
+			if (s->fx.any_warp()) {
+					// bounding box of the sprite in the temporary texture (uv); centres are given in sprite pixels
+					float bx0 = e.item.x[0], bx1 = bx0, by0 = e.item.y[0], by1 = by0;
+					for (int i = 1; i < 4; i++) {
+						bx0 = std::min(bx0, e.item.x[i]);
+						bx1 = std::max(bx1, e.item.x[i]);
+						by0 = std::min(by0, e.item.y[i]);
+						by1 = std::max(by1, e.item.y[i]);
+					}
+					const float fw = static_cast<float>(w), fh = static_cast<float>(h);
+					const float sw = std::max(1.f, s->width), sh = std::max(1.f, s->height);
+					auto warp = [&](int kind, float cx, float cy, float power, float freq, float phase, float extra) {
+						RenderPass p = effect(RenderPass::Op::Warp, cur, cur == a ? b : a);
+						p.p[0] = static_cast<float>(kind);
+						p.p[1] = (bx0 + cx / sw * (bx1 - bx0)) / fw;
+						p.p[2] = (by0 + cy / sh * (by1 - by0)) / fh;
+						p.p[3] = fw / fh;
+						p.p[4] = power;
+						p.p[5] = freq;
+						p.p[6] = phase;
+						p.p[7] = extra;
+						p.p[8] = sw;
+						p.p[9] = sh;
+						p.p[12] = bx0 / fw;
+						p.p[13] = by0 / fh;
+						p.p[14] = bx1 / fw;
+						p.p[15] = by1 / fh;
+						cur = p.temp_target;
+						e.pre.push_back(std::move(p));
+					};
+					const auto& fx = s->fx;
+					if (fx.lens.value[0] != 0) warp(1, fx.lens_cx, fx.lens_cy, fx.lens.value[0], 0.f, 0.f, fx.lens.value[1]);
+					if (fx.ripple.value[0] != 0) warp(0, fx.ripple_cx, fx.ripple_cy, fx.ripple.value[0], fx.ripple.value[1], fx.ripple_phase, 0.f);
+					if (fx.raster.value[0] != 0) warp(2, 0.f, 0.f, fx.raster.value[0], fx.raster.value[1], fx.raster_phase, fx.raster_rotate * 0.017453292f);
+				}
+				if (s->fx.any_color()) {
 				RenderPass c = effect(RenderPass::Op::Color, cur, cur == a ? b : a);
 				c.p[0] = s->fx.hue.value[0];
 				c.p[1] = s->fx.saturation.value[0];

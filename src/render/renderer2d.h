@@ -56,7 +56,7 @@ private:
 	Texture* make_rule_texture(float now, float rate);
 	Scratch& scratch(int w, int h);
 	Texture* temp_texture(int slot, int w, int h);
-	SDL_GPUGraphicsPipeline* fx_pipeline(bool blur);
+	SDL_GPUGraphicsPipeline* fx_pipeline(int kind); // 0 colour, 1 blur, 2 warp
 	void draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list);
 	void ensure_vertex_buffer(size_t bytes);
 
@@ -72,7 +72,7 @@ private:
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
 	std::map<std::pair<int, int>, Scratch> scratch_;
 	std::vector<Texture*> temps_;                      // temporary textures of the effect chains, by slot
-	SDL_GPUGraphicsPipeline* fx_pipes_[2] = {};        // [0] colour, [1] blur
+	SDL_GPUGraphicsPipeline* fx_pipes_[3] = {};        // [0] colour, [1] blur, [2] warp
 	Texture* rule_ = nullptr;         // transition rule ramp
 	SDL_GPUBuffer* vbuf_ = nullptr;
 	SDL_GPUTransferBuffer* vtransfer_ = nullptr;

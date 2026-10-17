@@ -1,0 +1,9 @@
+::k <- SQSprite("k"); ::k.createColor(1024,576,20,20,60); ::k.setPriority(29000);
+::mkq <- function(n, x, y, p) { local s = SQSprite(n); s.create("media/cg/bg/bg010200_1_学校屋上.png", -1,-1,-1,-1); s.setPriority(p); s.scale(0.5, 0.5, 0, 0); s.move(x, y, 0, 0); return s; }
+::a <- ::mkq("a", -256, -144, 29500); // ripple
+::a.setRipple(512, 288, 30, 1500, 0, 0, 0);
+::b <- ::mkq("b", 256, -144, 29501); // lens
+::b.setLens(512, 288, 650, 500, 0, 0);
+::c <- ::mkq("c", -256, 144, 29502); // raster
+::c.setRaster(0, 30, 1500, 0, 0, 0);
+::d <- ::mkq("d", 256, 144, 29503); // reference

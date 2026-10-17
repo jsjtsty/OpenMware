@@ -44,6 +44,43 @@ float4 main(PSInput input) : SV_Target
     }
     return sum / weights;
 }
+#elif defined(FX_WARP)
+
+// Ripple (0), lens (1), raster (2): the picture is resampled at a displaced position. All distances are in sprite pixels.
+float4 main(PSInput input) : SV_Target
+{
+    UseAllInputs(input);
+    float4 p0 = Texture_Params.Load(int3(0, 0, 0)); // kind, centre uv (x, y), unused
+    float4 p1 = Texture_Params.Load(int3(1, 0, 0)); // power, frequency, phase, radius (lens) / angle (raster)
+    float4 p2 = Texture_Params.Load(int3(2, 0, 0)); // sprite size in px
+    float4 p3 = Texture_Params.Load(int3(3, 0, 0)); // uv bounds of the sprite: min x, min y, max x, max y
+    float2 ext = p3.zw - p3.xy;
+    float2 local = (input.uv - p3.xy) / ext * p2.xy;
+    float2 centre = (p0.yz - p3.xy) / ext * p2.xy;
+    const float kTau = 6.2831853;
+    float2 offset = 0.0;
+    if (p0.x < 0.5)
+    {
+        float2 delta = local - centre;
+        float d = length(delta);
+        float2 dir = d > 0.0 ? delta / d : float2(0.0, 0.0);
+        offset = dir * (p1.x * 0.1) * sin(d * p1.y * kTau / 100000.0 - p1.z);
+    }
+    else if (p0.x < 1.5)
+    {
+        float2 delta = local - centre;
+        float r = length(delta) / max(p1.w, 1.0);
+        if (r < 1.0)
+            offset = -delta * (p1.x / 1000.0) * (1.0 - r) * (1.0 - r);
+    }
+    else
+    {
+        float2 axis = float2(cos(p1.w), sin(p1.w));
+        float s = dot(local, float2(-axis.y, axis.x));
+        offset = axis * (p1.x * 0.1) * sin(s * p1.y * kTau / 100000.0 - p1.z);
+    }
+    return Texture_Tex0.Sample(Sampler_Tex0, input.uv + offset / p2.xy * ext);
+}
 #else
 
 float4 main(PSInput input) : SV_Target

@@ -5,6 +5,7 @@
 #include "render/blend.h"
 
 #include <array>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -78,9 +79,22 @@ struct Sprite {
 			return hue.value[0] != 0 || saturation.value[0] != 0 || brightness.value[0] != 0 || glow.value[0] != 0 || sepia.value[0] > 0 ||
 				   nega.value[0] > 0 || mono.value[0] > 0;
 		}
-		bool any() const { return any_color() || shade.value[0] > 0; }
+		// Distortions: ripple / raster = {power, frequency, speed}, lens = {power, radius}. Centres are in sprite pixels, the
+		// raster angle in degrees, the phases (advanced by the speed) in radians. Exact scaling of the originals is a guess.
+		Anim<3> ripple, raster;
+		Anim<2> lens;
+		float ripple_cx = 0, ripple_cy = 0, lens_cx = 0, lens_cy = 0, raster_rotate = 0;
+		float ripple_phase = 0, raster_phase = 0;
+		bool any_warp() const { return ripple.value[0] != 0 || raster.value[0] != 0 || lens.value[0] != 0; }
+		bool any() const { return any_color() || shade.value[0] > 0 || any_warp(); }
 		void update(float dt) {
 			for (Anim<1>* a : {&hue, &saturation, &brightness, &glow, &sepia, &nega, &mono, &shade}) a->update(dt);
+			ripple.update(dt);
+			raster.update(dt);
+			lens.update(dt);
+			constexpr float kTau = 6.2831853f;
+			ripple_phase = std::fmod(ripple_phase + ripple.value[2] * dt * 0.001f * kTau, kTau);
+			raster_phase = std::fmod(raster_phase + raster.value[2] * dt * 0.001f * kTau, kTau);
 		}
 	} fx;
 	float pivot_x = 0.5f, pivot_y = 0.5f; // rotation/scale centre as a fraction of the size
@@ -118,7 +132,7 @@ struct DrawItem : DrawQuad {
 // One render pass. Draw: the items drawn into `target` (null: the game frame) or temporary slot `temp_target`, in order.
 // Blur/Color: a post effect of temporary slot `in_temp` written to `temp_target`.
 struct RenderPass {
-	enum class Op { Draw, Blur, Color } op = Op::Draw;
+	enum class Op { Draw, Blur, Color, Warp } op = Op::Draw;
 	Texture* target = nullptr;
 	int temp_target = -1;
 	int in_temp = -1;
@@ -126,8 +140,9 @@ struct RenderPass {
 	bool hi = false; // part of the game frame: rendered at the renderer's supersampled resolution
 	std::vector<DrawItem> items;
 	// Blur: p[0..1] = step in UV, p[2] = sigma in texels.  Color: p[0..3] hue/saturation/value/glow, p[4..6] sepia/nega/mono,
-	// p[8..9] mono cb/cr.
-	float p[12] = {};
+	// p[8..9] mono cb/cr.  Warp: p[0] kind (0 ripple, 1 lens, 2 raster), p[1..2] centre (uv), p[3] aspect (sprite w/h),
+	// p[4..7] power, frequency, phase, radius (lens) / angle (raster), p[8..9] sprite size in px, p[12..15] sprite uv bounds.
+	float p[16] = {};
 };
 using DrawList = std::vector<RenderPass>; // surfaces first, the game frame last
 

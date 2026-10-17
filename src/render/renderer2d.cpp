@@ -132,10 +132,10 @@ Texture* Renderer2D::temp_texture(int slot, int w, int h) {
 }
 
 // Post effect pipelines (fx.hlsl): fullscreen quad of the sprite vertex format, result written as is (no blending).
-SDL_GPUGraphicsPipeline* Renderer2D::fx_pipeline(bool blur) {
-	SDL_GPUGraphicsPipeline*& pipe = fx_pipes_[blur ? 1 : 0];
+SDL_GPUGraphicsPipeline* Renderer2D::fx_pipeline(int kind) {
+	SDL_GPUGraphicsPipeline*& pipe = fx_pipes_[kind];
 	if (pipe) return pipe;
-	const char* name = blur ? "psfx_blur.frag" : "psfx_color.frag";
+	const char* name = kind == 1 ? "psfx_blur.frag" : kind == 2 ? "psfx_warp.frag" : "psfx_color.frag";
 	SDL_GPUShader* ps = gpu_->load_shader(name, SDL_GPU_SHADERSTAGE_FRAGMENT, 2, 0);
 	if (!ps) {
 		std::fprintf(stderr, "[render] missing pixel shader %s\n", name);
@@ -505,9 +505,9 @@ void Renderer2D::draw_passes(SDL_GPUCommandBuffer* cmd, const DrawList& list) {
 		const size_t base = pass_base[pi];
 
 		if (ps.op != RenderPass::Op::Draw) { // post effect over a temporary texture
-			const bool blur = ps.op == RenderPass::Op::Blur;
+			const int kind = ps.op == RenderPass::Op::Blur ? 1 : ps.op == RenderPass::Op::Warp ? 2 : 0;
 			begin_pass(target, true, 0.f);
-			if (SDL_GPUGraphicsPipeline* p = fx_pipeline(blur)) {
+			if (SDL_GPUGraphicsPipeline* p = fx_pipeline(kind)) {
 				SDL_BindGPUGraphicsPipeline(rp, p);
 				SDL_GPUTextureSamplerBinding ts[2] = {{temp_texture(ps.in_temp, tw, th)->gpu, sampler_linear_},
 													   {fx_params_[fx_index[pi]], sampler_point_}};

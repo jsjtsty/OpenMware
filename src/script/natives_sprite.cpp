@@ -376,6 +376,47 @@ SQInteger set_shading_parameter(HSQUIRRELVM v) { // (level, density)
 SQInteger get_shading_level(HSQUIRRELVM v) { sq_pushinteger(v, spr(v)->fx.shade_level); return 1; }
 SQInteger get_shading_density(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.shade_density); return 1; }
 
+// Distortions (ripple / raster / lens): animated parameters, plain centre / angle / phase.
+SQInteger set_ripple(HSQUIRRELVM v) { // (x, y, power, frequency, speed, time, tempo)
+	auto& f = spr(v)->fx;
+	f.ripple_cx = arg_float(v, 2);
+	f.ripple_cy = arg_float(v, 3);
+	f.ripple.start({arg_float(v, 4), arg_float(v, 5), arg_float(v, 6)}, arg_float(v, 7), static_cast<int>(arg_int(v, 8)));
+	return 0;
+}
+SQInteger set_raster(HSQUIRRELVM v) { // (rotate, power, frequency, speed, time, tempo)
+	auto& f = spr(v)->fx;
+	f.raster_rotate = arg_float(v, 2);
+	f.raster.start({arg_float(v, 3), arg_float(v, 4), arg_float(v, 5)}, arg_float(v, 6), static_cast<int>(arg_int(v, 7)));
+	return 0;
+}
+SQInteger set_lens(HSQUIRRELVM v) { // (x, y, power, radius, time, tempo)
+	auto& f = spr(v)->fx;
+	f.lens_cx = arg_float(v, 2);
+	f.lens_cy = arg_float(v, 3);
+	f.lens.start({arg_float(v, 4), arg_float(v, 5)}, arg_float(v, 6), static_cast<int>(arg_int(v, 7)));
+	return 0;
+}
+template <auto M, int I> SQInteger warp_get(HSQUIRRELVM v) { sq_pushfloat(v, (spr(v)->fx.*M).value[I]); return 1; }
+template <auto M> SQInteger warp_get_timer(HSQUIRRELVM v) {
+	const auto& a = spr(v)->fx.*M;
+	sq_pushfloat(v, a.active ? a.timer : 0.f);
+	return 1;
+}
+template <auto M> SQInteger warp_set_timer(HSQUIRRELVM v) { (spr(v)->fx.*M).set_timer(arg_float(v, 2)); return 0; }
+template <auto M> SQInteger fx_get_float(HSQUIRRELVM v) { sq_pushfloat(v, spr(v)->fx.*M); return 1; }
+template <auto M> SQInteger fx_set_float(HSQUIRRELVM v) { spr(v)->fx.*M = arg_float(v, 2); return 0; }
+SQInteger get_ripple_center(HSQUIRRELVM v) {
+	set_ret(v, 1, spr(v)->fx.ripple_cx);
+	set_ret(v, 2, spr(v)->fx.ripple_cy);
+	return 0;
+}
+SQInteger get_lens_center(HSQUIRRELVM v) {
+	set_ret(v, 1, spr(v)->fx.lens_cx);
+	set_ret(v, 2, spr(v)->fx.lens_cy);
+	return 0;
+}
+
 // setXTimer(ms): jumps the animation to that point; getXTimer(): elapsed ms (used when saving).
 template <auto M> SQInteger anim_set_timer(HSQUIRRELVM v) {
 	(spr(v)->*M).set_timer(arg_float(v, 2));
@@ -492,6 +533,31 @@ static void register_effect_methods(ScriptHost& h) {
 	h.add_method("setShadingParameter", set_shading_parameter);
 	h.add_method("getShadingLevel", get_shading_level);
 	h.add_method("getShadingDensity", get_shading_density);
+	using E = Sprite::Effects;
+	h.add_method("setRipple", set_ripple);
+	h.add_method("getRippleCenter", get_ripple_center);
+	h.add_method("getRipplePower", warp_get<&E::ripple, 0>);
+	h.add_method("getRippleFrequency", warp_get<&E::ripple, 1>);
+	h.add_method("getRippleSpeed", warp_get<&E::ripple, 2>);
+	h.add_method("getRippleTimer", warp_get_timer<&E::ripple>);
+	h.add_method("setRippleTimer", warp_set_timer<&E::ripple>);
+	h.add_method("getRipplePhase", fx_get_float<&E::ripple_phase>);
+	h.add_method("setRipplePhase", fx_set_float<&E::ripple_phase>);
+	h.add_method("setRaster", set_raster);
+	h.add_method("getRasterRotate", fx_get_float<&E::raster_rotate>);
+	h.add_method("getRasterPower", warp_get<&E::raster, 0>);
+	h.add_method("getRasterFrequency", warp_get<&E::raster, 1>);
+	h.add_method("getRasterSpeed", warp_get<&E::raster, 2>);
+	h.add_method("getRasterTimer", warp_get_timer<&E::raster>);
+	h.add_method("setRasterTimer", warp_set_timer<&E::raster>);
+	h.add_method("getRasterPhase", fx_get_float<&E::raster_phase>);
+	h.add_method("setRasterPhase", fx_set_float<&E::raster_phase>);
+	h.add_method("setLens", set_lens);
+	h.add_method("getLensCenter", get_lens_center);
+	h.add_method("getLensPower", warp_get<&E::lens, 0>);
+	h.add_method("getLensRadius", warp_get<&E::lens, 1>);
+	h.add_method("getLensTimer", warp_get_timer<&E::lens>);
+	h.add_method("setLensTimer", warp_set_timer<&E::lens>);
 }
 
 static void register_sprite_members(ScriptHost& h, SQFUNCTION constructor, bool render_target = false);
