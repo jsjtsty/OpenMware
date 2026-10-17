@@ -1,7 +1,6 @@
 ref/
 .venv/
 build/
-keys.local.txt
 .cache/
 libtotono/
 .claude/

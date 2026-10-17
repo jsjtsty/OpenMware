@@ -6,7 +6,7 @@ An open-source reimplementation of the engine behind a family of Japanese visual
 
 The current target is the Steam Chinese release of *君与彼女与彼女之恋* (*You and Me and Her*).
 
-**This repository contains no game data, no encryption keys and no assets.** You supply your own copy of the game and the archive keys.
+**This repository contains no game data and no assets.** You supply your own copy of the game. The NPK archive keys of the supported game are in `keys.local.txt` (private repository; remove the file before making it public).
 
 ## Status
 
