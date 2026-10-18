@@ -26,7 +26,7 @@ struct AddGameView: View {
             Form {
                 Section(L("add_step_folder")) {
                     Text(L("add_folder_hint")).font(.callout).foregroundStyle(.secondary)
-                    Button { showFolderImporter = true } label: {
+                    Button { pickFolder() } label: {
                         Label(L(scan == nil ? "add_choose_folder" : "add_change_folder"), systemImage: "folder")
                     }
                     .fileImporter(isPresented: $showFolderImporter, allowedContentTypes: [UTType.folder]) { result in
@@ -59,7 +59,7 @@ struct AddGameView: View {
                 }
 
                 Section(L("add_step_keys")) {
-                    Button { showKeysImporter = true } label: { Label(L("add_keys_import"), systemImage: "key") }
+                    Button { pickKeys() } label: { Label(L("add_keys_import"), systemImage: "key") }
                         .fileImporter(isPresented: $showKeysImporter, allowedContentTypes: [UTType.plainText, UTType.data]) { result in
                             guard case .success(let url) = result else {
                                 if case .failure(let e) = result { error = e.localizedDescription }
@@ -116,6 +116,29 @@ struct AddGameView: View {
             }
             .interactiveDismissDisabled(working != nil)
         }
+    }
+
+    private func pickFolder() {
+        #if os(iOS)
+        DocumentPicker.present(types: [UTType.folder]) { folderPicked($0) }
+        #else
+        showFolderImporter = true
+        #endif
+    }
+
+    private func pickKeys() {
+        #if os(iOS)
+        DocumentPicker.present(types: [UTType.plainText, UTType.data]) { keysText = store.readText($0) }
+        #else
+        showKeysImporter = true
+        #endif
+    }
+
+    private func folderPicked(_ url: URL) {
+        let s = store.scan(url)
+        scan = s
+        if name.isEmpty { name = s.displayName }
+        error = nil
     }
 
     private func startAdding() {
