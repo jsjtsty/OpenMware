@@ -173,13 +173,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
-      - uses: actions/cache@v4
-        with:
-          path: build
-          key: build-android-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
-          restore-keys: build-android-
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -188,6 +181,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      # After setup-gradle on purpose: its wrapper check scans the workspace and rejects the gradle-wrapper.jar inside SDL's sources.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-android-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-android-
 
       - name: Build tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build
