@@ -31,6 +31,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-windows-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-windows-
+
       # FFmpeg's configure/make needs a POSIX shell; MSYS2 only provides the shell, make and nasm, MSVC compiles.
       - uses: msys2/setup-msys2@v2
         id: msys
@@ -93,6 +100,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-linux-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-linux-
+
       # SDL3's development packages, FFmpeg's build tools and Qt 6 (the launcher links the distribution's Qt dynamically).
       - name: Build tools
         run: |
@@ -125,6 +139,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-macos-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-macos-
+
       - name: Build tools
         run: brew install ninja xcodegen
 
@@ -151,6 +172,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-android-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-android-
 
       - uses: actions/setup-java@v4
         with:
@@ -191,18 +219,25 @@ jobs:
           OMW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           OMW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           OMW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: bash scripts/android/build.sh debug
+        run: bash scripts/android/build.sh release
 
       - uses: actions/upload-artifact@v4
         with:
           name: OpenMware-android-arm64
-          path: dist/OpenMware-android-arm64-debug.apk
+          path: dist/OpenMware-android-arm64-release.apk
 
   ios:
     name: iOS arm64
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      # Dependencies (SDL3, FFmpeg, ...) are built inside build/; restoring it makes a run incremental instead of from scratch.
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: build-ios-${{ hashFiles('cmake/**', 'CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: build-ios-
 
       - name: Build tools
         run: brew install xcodegen
