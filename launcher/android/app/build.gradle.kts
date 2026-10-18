@@ -34,11 +34,23 @@ android {
         jniLibs { useLegacyPackaging = false }
     }
 
+    // A fixed key from the environment (CI: GitHub secrets) so every build is signed alike and installs over the previous one.
+    // Without it the default debug key is used, which Gradle generates per machine (a fresh CI runner gets a new one every time).
+    val keystorePath = System.getenv("OMW_KEYSTORE_FILE")
+    val fixedKey = if (!keystorePath.isNullOrEmpty()) signingConfigs.create("fixed") {
+        storeFile = file(keystorePath)
+        storePassword = System.getenv("OMW_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("OMW_KEY_ALIAS")
+        keyPassword = System.getenv("OMW_KEY_PASSWORD").takeUnless { it.isNullOrEmpty() } ?: System.getenv("OMW_KEYSTORE_PASSWORD")
+    } else null
+
     buildTypes {
+        debug {
+            if (fixedKey != null) signingConfig = fixedKey
+        }
         release {
             isMinifyEnabled = false
-            // Debug-signed so the release APK installs for testing; real distribution needs its own keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = fixedKey ?: signingConfigs.getByName("debug")
         }
     }
 

@@ -173,7 +173,24 @@ jobs:
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
 
+      # A fixed signing key keeps updates installable. Secrets: ANDROID_KEYSTORE_BASE64 (base64 of the .jks), ANDROID_KEYSTORE_PASSWORD,
+      # ANDROID_KEY_ALIAS, optionally ANDROID_KEY_PASSWORD. Without them (forks) the build falls back to a throwaway debug key.
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/openmware.jks"
+            echo "OMW_KEYSTORE_FILE=$RUNNER_TEMP/openmware.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set; the APK gets a random debug signature and cannot update an earlier build"
+          fi
+
       - name: App
+        env:
+          OMW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          OMW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          OMW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: bash scripts/android/build.sh debug
 
       - uses: actions/upload-artifact@v4
