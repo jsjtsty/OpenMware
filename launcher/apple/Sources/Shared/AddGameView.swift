@@ -6,10 +6,9 @@ struct AddGameView: View {
     @Environment(\.dismiss) private var dismiss
     var onAdded: (String) -> Void
 
-    private enum Importer { case folder, keys }
 
-    @State private var showImporter = false
-    @State private var importer: Importer = .folder // what the open panel is for; stays set while the result is handled
+    @State private var showFolderImporter = false // one importer per button: a shared one with changing content types fails to appear on iOS
+    @State private var showKeysImporter = false
     @State private var scan: FolderScan?
     @State private var name = ""
     @State private var keysText = ""
@@ -27,8 +26,15 @@ struct AddGameView: View {
             Form {
                 Section(L("add_step_folder")) {
                     Text(L("add_folder_hint")).font(.callout).foregroundStyle(.secondary)
-                    Button { importer = .folder; showImporter = true } label: {
+                    Button { showFolderImporter = true } label: {
                         Label(L(scan == nil ? "add_choose_folder" : "add_change_folder"), systemImage: "folder")
+                    }
+                    .fileImporter(isPresented: $showFolderImporter, allowedContentTypes: [UTType.folder]) { result in
+                        guard case .success(let url) = result else { return }
+                        let s = store.scan(url)
+                        scan = s
+                        if name.isEmpty { name = s.displayName }
+                        error = nil
                     }
                     if let scan {
                         if scan.isGame {
@@ -50,7 +56,11 @@ struct AddGameView: View {
                 }
 
                 Section(L("add_step_keys")) {
-                    Button { importer = .keys; showImporter = true } label: { Label(L("add_keys_import"), systemImage: "key") }
+                    Button { showKeysImporter = true } label: { Label(L("add_keys_import"), systemImage: "key") }
+                        .fileImporter(isPresented: $showKeysImporter, allowedContentTypes: [UTType.plainText, UTType.data]) { result in
+                            guard case .success(let url) = result else { return }
+                            keysText = store.readText(url)
+                        }
                     Text(L("add_keys_paste")).font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $keysText)
                         .font(.system(.caption, design: .monospaced))
@@ -96,22 +106,6 @@ struct AddGameView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L("add_import")) { startAdding() }.disabled(!canAdd)
-                }
-            }
-            .fileImporter(
-                isPresented: $showImporter,
-                allowedContentTypes: importer == .folder ? [UTType.folder] : [UTType.plainText, UTType.data],
-                allowsMultipleSelection: false
-            ) { result in
-                guard case .success(let urls) = result, let url = urls.first else { return }
-                switch importer {
-                case .folder:
-                    let s = store.scan(url)
-                    scan = s
-                    if name.isEmpty { name = s.displayName }
-                    error = nil
-                case .keys:
-                    keysText = store.readText(url)
                 }
             }
             .interactiveDismissDisabled(working != nil)
