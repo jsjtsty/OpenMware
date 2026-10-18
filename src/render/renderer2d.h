@@ -77,6 +77,7 @@ private:
 	size_t ptransfer_capacity_ = 0;
 	int ss_ = 2; // the game frame is rendered at ss_ x the logical 1024x576 and scaled down to the window
 	SDL_GPUTexture* frame_ = nullptr; // offscreen game frame
+	std::vector<SDL_GPUTexture*> down_; // down_[i]: the frame halved i+1 times (a bilinear blit only averages 2x2 texels, so big reductions go in 2:1 steps)
 	std::map<std::pair<int, int>, Scratch> scratch_;
 	std::vector<Texture*> temps_;                      // temporary textures of the effect chains, by slot
 	SDL_GPUGraphicsPipeline* fx_pipes_[3] = {};        // [0] colour, [1] blur, [2] warp

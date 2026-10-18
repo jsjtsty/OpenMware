@@ -201,6 +201,8 @@ void Renderer2D::shutdown() {
 	if (vbuf_) SDL_ReleaseGPUBuffer(gpu_->device, vbuf_);
 	if (vtransfer_) SDL_ReleaseGPUTransferBuffer(gpu_->device, vtransfer_);
 	if (frame_) SDL_ReleaseGPUTexture(gpu_->device, frame_);
+	for (SDL_GPUTexture* t : down_) if (t) SDL_ReleaseGPUTexture(gpu_->device, t);
+	down_.clear();
 	for (auto& [k, s] : scratch_) {
 		if (s.mask) SDL_ReleaseGPUTexture(gpu_->device, s.mask);
 		if (s.dest) SDL_ReleaseGPUTexture(gpu_->device, s.dest);
@@ -626,10 +628,41 @@ bool Renderer2D::render_frame(const DrawList& list) {
 	// Letterbox the fixed frame into the window.
 	const float scale = std::min(sw / static_cast<float>(Stage::kWidth), sh / static_cast<float>(Stage::kHeight));
 	const float dw = Stage::kWidth * scale, dh = Stage::kHeight * scale;
+	// A bilinear blit reads 2x2 texels, so shrinking by more than 2x skips texels and the text turns jagged. Halve in 2:1 steps
+	// (each an exact box filter) until the last step is at most 2:1.
+	SDL_GPUTexture* src = frame_;
+	Uint32 sw_ = Stage::kWidth * ss_, sh_ = Stage::kHeight * ss_;
+	for (size_t level = 0; sw_ % 2 == 0 && sh_ % 2 == 0 && sw_ >= 2 * dw * 1.0001f && sh_ >= 2 * dh * 1.0001f; level++) {
+		if (level == down_.size()) {
+			SDL_GPUTextureCreateInfo ti{};
+			ti.type = SDL_GPU_TEXTURETYPE_2D;
+			ti.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+			ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+			ti.width = sw_ / 2;
+			ti.height = sh_ / 2;
+			ti.layer_count_or_depth = 1;
+			ti.num_levels = 1;
+			down_.push_back(SDL_CreateGPUTexture(gpu_->device, &ti));
+		}
+		if (!down_[level]) break;
+		SDL_GPUBlitInfo hb{};
+		hb.source.texture = src;
+		hb.source.w = sw_;
+		hb.source.h = sh_;
+		hb.destination.texture = down_[level];
+		hb.destination.w = sw_ / 2;
+		hb.destination.h = sh_ / 2;
+		hb.load_op = SDL_GPU_LOADOP_DONT_CARE;
+		hb.filter = SDL_GPU_FILTER_LINEAR;
+		SDL_BlitGPUTexture(cmd, &hb);
+		src = down_[level];
+		sw_ /= 2;
+		sh_ /= 2;
+	}
 	SDL_GPUBlitInfo bi{};
-	bi.source.texture = frame_;
-	bi.source.w = Stage::kWidth * ss_;
-	bi.source.h = Stage::kHeight * ss_;
+	bi.source.texture = src;
+	bi.source.w = sw_;
+	bi.source.h = sh_;
 	bi.destination.texture = swap;
 	bi.destination.x = static_cast<Uint32>((sw - dw) / 2);
 	bi.destination.y = static_cast<Uint32>((sh - dh) / 2);
