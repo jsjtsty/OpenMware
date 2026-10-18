@@ -30,7 +30,10 @@ struct AddGameView: View {
                         Label(L(scan == nil ? "add_choose_folder" : "add_change_folder"), systemImage: "folder")
                     }
                     .fileImporter(isPresented: $showFolderImporter, allowedContentTypes: [UTType.folder]) { result in
-                        guard case .success(let url) = result else { return }
+                        guard case .success(let url) = result else {
+                            if case .failure(let e) = result { error = e.localizedDescription }
+                            return
+                        }
                         let s = store.scan(url)
                         scan = s
                         if name.isEmpty { name = s.displayName }
@@ -58,7 +61,10 @@ struct AddGameView: View {
                 Section(L("add_step_keys")) {
                     Button { showKeysImporter = true } label: { Label(L("add_keys_import"), systemImage: "key") }
                         .fileImporter(isPresented: $showKeysImporter, allowedContentTypes: [UTType.plainText, UTType.data]) { result in
-                            guard case .success(let url) = result else { return }
+                            guard case .success(let url) = result else {
+                                if case .failure(let e) = result { error = e.localizedDescription }
+                                return
+                            }
                             keysText = store.readText(url)
                         }
                     Text(L("add_keys_paste")).font(.caption).foregroundStyle(.secondary)
