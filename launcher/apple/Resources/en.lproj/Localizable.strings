@@ -78,3 +78,14 @@
 "about_licenses" = "Open-source licences";
 "about_licenses_body" = "SDL3 (zlib), zstd (BSD), libwebp (BSD), stb (public domain) and Squirrel (MIT).";
 "about_ffmpeg" = "FFmpeg (LGPL 2.1 or later) is included as separate dynamic libraries in the app's Frameworks folder and can be replaced with your own build. Its licence text is in the app's Resources/licenses folder.";
+
+/* iOS: games are folders put into the app's Documents folder with the Files app */
+"files_howto" = "1. Open the Files app and go to On My iPad (or iPhone) › OpenMware.\n2. Copy or move the game folder (the one with script.npk, cg.npk and the other .npk files) into it.\n3. Come back here: the game shows up by itself. Open it and paste its keys.\n\nA keys.txt inside the game folder, or in the OpenMware folder (shared by all games), is read automatically.";
+"files_open" = "Open in Files";
+"files_refresh" = "Refresh";
+"files_more_hint" = "To add more games, put their folders into On My iPad › OpenMware with the Files app.";
+"files_remove_hint" = "To remove it from the library, delete or move the folder “%@” in OpenMware with the Files app. The saves are kept and come back when a folder of the same name is put there again.";
+"files_readme_name" = "Put game folders here.txt";
+"files_readme_body" = "Put game folders (with script.npk and the other .npk files) into this OpenMware folder; they show up in the OpenMware library by themselves.\nA keys.txt can go inside a game folder, or here to be shared by all games.\n";
+"storage_documents" = "OpenMware folder in Files";
+"detail_keys_paste" = "Paste Keys";

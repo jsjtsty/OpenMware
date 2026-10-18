@@ -35,7 +35,65 @@ final class LibraryStore: ObservableObject {
         root = support.appendingPathComponent("OpenMware", isDirectory: true)
         try? FileManager.default.createDirectory(at: root.appendingPathComponent("Games"), withIntermediateDirectories: true)
         load()
+        #if os(iOS)
+        syncDocuments()
+        #endif
     }
+
+    /// The app's Documents folder; on iOS the Files app shows it as "On My iPad/iPhone › OpenMware".
+    nonisolated static var documents: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
+
+    #if os(iOS)
+    /// iOS library: every folder in Documents that holds script.npk is a game. The system folder picker cannot be relied on
+    /// (with some re-signing tools it never hands the folder to the app), so games are put there with the Files app instead.
+    /// A folder keeps its game id (derived from its name), so saves and play time come back when it is put there again;
+    /// a folder that is gone drops out of the list, its saves stay in Application Support.
+    func syncDocuments() {
+        let fm = FileManager.default
+        let readme = Self.documents.appendingPathComponent(L("files_readme_name"))
+        if !fm.fileExists(atPath: readme.path) { try? L("files_readme_body").write(to: readme, atomically: true, encoding: .utf8) }
+        let items = (try? fm.contentsOfDirectory(at: Self.documents, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
+        var present = Set<String>()
+        var changed = false
+        for dir in items where (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            guard fm.fileExists(atPath: dir.appendingPathComponent("script.npk").path) else { continue }
+            let name = dir.lastPathComponent
+            present.insert(name)
+            if games.contains(where: { $0.storage == .documents(folder: name) }) { continue }
+            var h: UInt64 = 14695981039346656037 // FNV-1a: the same folder name gives the same id
+            for b in name.utf8 { h = (h ^ UInt64(b)) &* 1099511628211 }
+            let id = "doc-" + String(h, radix: 16)
+            var game = Game(id: id, name: name, addedAt: Date(), lastPlayedAt: nil, playSeconds: 0, storage: .documents(folder: name))
+            if let old = loadKept(id) { game = old } // put back after it had been taken out
+            try? fm.createDirectory(at: dataURL(game), withIntermediateDirectories: true)
+            if Keys.count(in: keysURL(game)) == 0 { // keys.txt inside the game folder, or one for all games next to the folders
+                for url in [dir.appendingPathComponent("keys.txt"), Self.documents.appendingPathComponent("keys.txt")] {
+                    if let text = try? String(contentsOf: url, encoding: .utf8), setKeys(game, text: text) > 0 { break }
+                }
+            }
+            games.append(game)
+            changed = true
+        }
+        let before = games.count
+        games.removeAll { game in
+            guard case .documents(let name) = game.storage, !present.contains(name) else { return false }
+            keep(game)
+            return true
+        }
+        if changed || games.count != before { save() }
+    }
+
+    /// A game whose Documents folder went away: its entry (name, play time) is kept next to its saves.
+    private func keep(_ game: Game) {
+        if let data = try? JSONEncoder().encode(game) { try? data.write(to: folder(game).appendingPathComponent("game.json"), options: .atomic) }
+    }
+
+    private func loadKept(_ id: String) -> Game? {
+        let url = root.appendingPathComponent("Games/\(id)/game.json")
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(Game.self, from: data)
+    }
+    #endif
 
     // MARK: Paths
 
@@ -49,6 +107,8 @@ final class LibraryStore: ObservableObject {
         switch game.storage {
         case .copied:
             return Access(url: copiedURL(game), stop: {})
+        case .documents(let name):
+            return Access(url: Self.documents.appendingPathComponent(name, isDirectory: true), stop: {})
         case .linked(let bookmark):
             var stale = false
             guard let url = try? URL(resolvingBookmarkData: bookmark, options: Self.bookmarkResolve, relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }

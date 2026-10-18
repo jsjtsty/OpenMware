@@ -1,10 +1,12 @@
 import Foundation
 
-/// How the game's files are reached: copied into the app's own storage, or linked to the folder the user picked
-/// (a security-scoped bookmark, so nothing is duplicated).
+/// How the game's files are reached: copied into the app's own storage, linked to the folder the user picked
+/// (a security-scoped bookmark, so nothing is duplicated), or (iOS) a folder the user put into the app's Documents folder
+/// with the Files app; those are found by `LibraryStore.syncDocuments()` and stored by folder name.
 enum GameStorage: Codable, Equatable {
     case copied
     case linked(bookmark: Data)
+    case documents(folder: String)
 }
 
 /// One game of the library. App-owned files live in Application Support/OpenMware/Games/<id>/ :
@@ -53,4 +55,30 @@ struct FolderScan {
     var archives: [URL]
     var totalBytes: Int64
     var isGame: Bool { archives.contains { $0.lastPathComponent.lowercased() == "script.npk" } }
+}
+
+extension GameStorage {
+    var labelKey: String {
+        switch self {
+        case .copied: return "storage_copied"
+        case .linked: return "storage_linked"
+        case .documents: return "storage_documents"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .copied: return "square.on.square"
+        case .linked: return "link"
+        case .documents: return "folder"
+        }
+    }
+}
+
+extension GameStorage {
+    /// The folder name in Documents, for a game found there.
+    var documentsFolder: String? {
+        if case .documents(let name) = self { return name }
+        return nil
+    }
 }

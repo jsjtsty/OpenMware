@@ -18,6 +18,8 @@ struct DetailView: View {
     @State private var confirmClear = false
     @State private var confirmRemove = false
     @State private var pickKeys = false
+    @State private var pasteKeys = false // iOS: the keys are pasted (the system picker does not work with every install)
+    @State private var pastedKeys = ""
     @State private var verifying = false
     @State private var verifyMessage: String?
 
@@ -103,8 +105,8 @@ struct DetailView: View {
                         StatTile(icon: "clock", title: L("detail_play_time"), value: game.playSeconds > 0 ? formatDuration(game.playSeconds) : L("never_played"))
                         StatTile(icon: "internaldrive", title: L("detail_size"), value: formatBytes(gameBytes))
                         StatTile(icon: "shippingbox", title: L("detail_archives"), value: "\(archiveCount)")
-                        StatTile(icon: game.storage == .copied ? "square.on.square" : "link",
-                                 title: L("detail_storage"), value: L(game.storage == .copied ? "storage_copied" : "storage_linked"))
+                        StatTile(icon: game.storage.icon,
+                                 title: L("detail_storage"), value: L(game.storage.labelKey))
                         StatTile(icon: "tray.full", title: L("detail_save_size"), value: saveBytes > 0 ? formatBytes(saveBytes) : L("detail_no_saves"))
                         StatTile(icon: "key", title: L("detail_keys"), value: keyCount > 0 ? L("add_keys_ok", keyCount) : L("add_keys_invalid"))
                     }
@@ -187,7 +189,7 @@ struct DetailView: View {
             Section {
                 row(L("detail_size"), formatBytes(gameBytes))
                 row(L("detail_archives"), "\(archiveCount)")
-                row(L("detail_storage"), L(game.storage == .copied ? "storage_copied" : "storage_linked"))
+                row(L("detail_storage"), L(game.storage.labelKey))
                 row(L("detail_play_time"), game.playSeconds > 0 ? formatDuration(game.playSeconds) : L("never_played"))
                 row(L("detail_save_size"), saveBytes > 0 ? formatBytes(saveBytes) : L("detail_no_saves"))
                 row(L("detail_keys"), keyCount > 0 ? L("add_keys_ok", keyCount) : L("add_keys_invalid"))
@@ -204,6 +206,7 @@ struct DetailView: View {
                 if let verifyMessage {
                     Text(verifyMessage).font(.callout).foregroundStyle(.secondary)
                 }
+                Button { pastedKeys = UIPasteboard.general.string ?? ""; pasteKeys = true } label: { Label(L("detail_keys_paste"), systemImage: "doc.on.clipboard") }
                 Button { pickKeys = true } label: { Label(L("detail_keys_replace"), systemImage: "key") }
                 Button { exportSaves(game) } label: { Label(L("detail_export_saves"), systemImage: "square.and.arrow.up") }
                     .disabled(saveBytes == 0)
@@ -212,7 +215,44 @@ struct DetailView: View {
             Section {
                 Button(role: .destructive) { confirmClear = true } label: { Label(L("detail_clear_saves"), systemImage: "trash") }
                     .disabled(saveBytes == 0)
-                Button(role: .destructive) { confirmRemove = true } label: { Label(L("detail_remove"), systemImage: "trash.fill") }
+                if game.storage.documentsFolder == nil {
+                    Button(role: .destructive) { confirmRemove = true } label: { Label(L("detail_remove"), systemImage: "trash.fill") }
+                }
+            } footer: {
+                if let folder = game.storage.documentsFolder { Text(L("files_remove_hint", folder)) }
+            }
+        }
+        .sheet(isPresented: $pasteKeys) { keysEditor(game) }
+    }
+
+    /// Paste the keys (starts with the clipboard); saving replaces the game's keys.txt.
+    private func keysEditor(_ game: Game) -> some View {
+        let count = Keys.parse(pastedKeys).count
+        return NavigationStack {
+            Form {
+                Section {
+                    TextEditor(text: $pastedKeys)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 160)
+                        .autocorrectionDisabledCompat()
+                } footer: {
+                    Text(pastedKeys.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L("add_keys_paste")
+                         : count > 0 ? L("add_keys_ok", count) : L("add_keys_invalid"))
+                }
+            }
+            .navigationTitle(L("detail_keys_paste"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(L("cancel")) { pasteKeys = false } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L("save")) {
+                        let n = store.setKeys(game, text: pastedKeys)
+                        verifyMessage = L("add_keys_ok", n)
+                        refresh += 1
+                        pasteKeys = false
+                    }
+                    .disabled(count == 0)
+                }
             }
         }
     }

@@ -78,3 +78,14 @@
 "about_licenses" = "开源许可";
 "about_licenses_body" = "SDL3（zlib）、zstd（BSD）、libwebp（BSD）、stb（公有领域）和 Squirrel（MIT）。";
 "about_ffmpeg" = "FFmpeg（LGPL 2.1 或更高版本）以独立动态库的形式放在应用的 Frameworks 文件夹中，可以替换成你自己编译的版本。许可证文本在应用的 Resources/licenses 文件夹里。";
+
+/* iOS: games are folders put into the app's Documents folder with the Files app */
+"files_howto" = "1. 打开“文件”应用，进入“我的 iPad（或 iPhone）› OpenMware”。\n2. 把游戏文件夹（包含 script.npk、cg.npk 等 .npk 文件）拷贝或移动进去。\n3. 回到这里，游戏会自动出现，然后点进游戏粘贴密钥即可。\n\n如果把 keys.txt 放在游戏文件夹里，或放在 OpenMware 文件夹里（所有游戏共用），会自动读取。";
+"files_open" = "在“文件”中打开";
+"files_refresh" = "刷新";
+"files_more_hint" = "要添加更多游戏，请在“文件”应用里把游戏文件夹放进“我的 iPad › OpenMware”。";
+"files_remove_hint" = "要从游戏库移除，请在“文件”应用里删除或移走 OpenMware 中的“%@”文件夹。存档会保留，放回同名文件夹后即可恢复。";
+"files_readme_name" = "把游戏文件夹放在这里.txt";
+"files_readme_body" = "把游戏文件夹（包含 script.npk 等 .npk 文件）放进这个 OpenMware 文件夹，打开 OpenMware 后它会自动出现在游戏库里。\nkeys.txt 可以放在游戏文件夹里，也可以放在这里供所有游戏共用。\n";
+"storage_documents" = "“文件”中的 OpenMware 文件夹";
+"detail_keys_paste" = "粘贴密钥";
